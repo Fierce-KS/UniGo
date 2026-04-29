@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}UniGo — Find Rides{% endblock %}
+{% block content %}
+<h1 class="page-title">Find Rides</h1>
+<p class="page-sub">Search for ride groups, book seats, and manage bookings</p>
+
+<div class="card">
+    <div class="card-head"><i data-lucide="search" style="width:14px;height:14px"></i> Search & Book</div>
+    <div class="card-body pad">
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">Your Name</label><select class="form-select" id="stu"></select></div>
+            <div class="form-group"><label class="form-label">Destination</label><select class="form-select" id="dest"></select></div>
+            <div class="form-group"><label class="form-label">Travel Date</label><input type="date" class="form-input" id="date" value="2026-05-01"></div>
+            <div class="form-group"><label class="form-label">Luggage (bags)</label><input type="number" class="form-input" id="lug" value="1" min="0" max="5"></div>
+        </div>
+
+        <div style="margin-bottom:16px">
+            <button type="button" class="priority-toggle" id="priorityBtn" onclick="togglePriority()">
+                <span class="toggle-dot"></span>
+                <i data-lucide="zap" style="width:14px;height:14px"></i> PriorityGo
+            </button>
+            <div class="priority-info" id="priorityInfo">
+                <strong>PriorityGo — Guaranteed Ride</strong><br>
+                Pay upfront and get a <strong>guaranteed seat</strong>. Your payment is locked in immediately — no cancellations allowed.<br>
+                <em>Requires trust score of 90 or higher.</em> Students who consistently follow through on their commitments earn this privilege.
+            </div>
+        </div>
+
+        <div class="action-row">
+            <button class="btn btn-green" onclick="findRides()"><i data-lucide="search" style="width:14px;height:14px"></i> Find Matches</button>
+            <button class="btn btn-black" onclick="bookRide()"><i data-lucide="ticket" style="width:14px;height:14px"></i> Book Selected</button>
+            <button class="btn btn-danger" onclick="cancelBooking()"><i data-lucide="x" style="width:14px;height:14px"></i> Cancel Booking</button>
+            <button class="btn btn-outline" onclick="completeRide()"><i data-lucide="check" style="width:14px;height:14px"></i> Complete Ride</button>
+        </div>
+    </div>
+</div>
+
+<div id="results" style="display:none">
+    <div class="card">
+        <div class="card-head"><span id="resultTitle">Matches</span></div>
+        <div class="card-body"><div class="table-wrap" id="matchTable"></div></div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-head"><i data-lucide="users" style="width:14px;height:14px"></i> Select Group to Book</div>
+    <div class="card-body pad">
+        <div class="form-row">
+            <div class="form-group"><label class="form-label">Ride Group</label><select class="form-select" id="grp"></select></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let priorityGo = false;
+
+async function init(){
+    const [stu,dests,grps] = await Promise.all([api('/api/students'),api('/api/destinations'),api('/api/ride-groups')]);
+    if(!stu)return;
+
+    document.getElementById('stu').innerHTML=stu.map(s=>{
+        return '<option value="'+s.student_id+'" data-trust="'+s.trust_score+'">'+s.name+' (Trust: '+s.trust_score+')'+(s.trust_score>=90?' [PG]':'')+'</option>';
+    }).join('');
+
+    document.getElementById('dest').innerHTML=(dests||[]).map(d=>'<option value="'+d.destination_id+'">'+d.city_name+'</option>').join('');
+
+    document.getElementById('grp').innerHTML=(grps||[]).map(g=>'<option value="'+g.group_id+'">Group '+g.group_id+' > '+g.city_name+' ('+g.seats_filled+'/'+g.seat_capacity+') ['+g.status+']</option>').join('');
+}
+
+async function togglePriority(){
+    const btn = document.getElementById('priorityBtn');
+    const info = document.getElementById('priorityInfo');
+
+    if(!priorityGo){
+        // Call DB function to check eligibility
+        const sid = document.getElementById('stu').value;
+        const d = await api('/api/priority-check',{method:'POST',body:{student_id: sid}});
+        if(!d) return;
+
+        if(d.status !== 'ELIGIBLE'){
+            toast('PriorityGo: ' + d.status.replace('NOT_ELIGIBLE:','Trust score is ') + '. Need 90+','error');
+            return;
+        }
+        priorityGo = true;
+        btn.classList.add('active');
+        info.classList.add('show');
+        toast('PriorityGo enabled — pay upfront for a guaranteed seat','success');
+    } else {
+        priorityGo = false;
+        btn.classList.remove('active');
+        info.classList.remove('show');
+    }
+}
+
+async function findRides(){
+    const data = await api('/api/find-buddies',{method:'POST',body:{
+        destination_id:document.getElementById('dest').value,
+        travel_date:document.getElementById('date').value,
+        luggage_count:document.getElementById('lug').value
+    }});
+    if(!data)return;
+    if(data.error){toast(data.error,'error');return;}
+
+    document.getElementById('results').style.display='block';
+    document.getElementById('resultTitle').textContent=data.count+' Match'+(data.count!==1?'es':'') + (priorityGo?' — PriorityGo':'');
+
+    let h='<table><thead><tr><th>Group</th><th>Destination</th><th>Date</th><th>Departs</th><th>Seats</th><th>Bags</th>'+(priorityGo?'<th>Guarantee</th>':'')+'</tr></thead><tbody>';
+    data.matches.forEach(m=>{
+        h+='<tr><td>'+m.group_id+'</td><td>'+m.city_name+'</td><td>'+m.departure_date+'</td><td>'+m.departure_time+'</td><td><span class="badge badge-green">'+m.available_seats+'</span></td><td><span class="badge badge-blue">'+m.available_bag_space+'</span></td>';
+        if(priorityGo) h+='<td><span class="badge badge-green">Guaranteed</span></td>';
+        h+='</tr>';
+    });
+    document.getElementById('matchTable').innerHTML=h+'</tbody></table>';
+    toast('Found '+data.count+' match(es)','success');
+}
+
+async function bookRide(){
+    const d = await api('/api/book',{method:'POST',body:{
+        group_id:document.getElementById('grp').value,
+        student_id:document.getElementById('stu').value,
+        luggage_count:document.getElementById('lug').value,
+        priority_go: priorityGo
+    }});
+    if(!d)return;
+    if(d.success){
+        toast(d.message,'success');
+    } else {
+        toast(d.error,'error');
+    }
+}
+
+async function cancelBooking(){
+    const d=await api('/api/cancel-booking',{method:'POST',body:{
+        group_id:document.getElementById('grp').value,
+        student_id:document.getElementById('stu').value
+    }});
+    if(!d)return;
+    d.success?toast('Cancelled — trust penalty applied (-15)','info'):toast(d.error||'Failed','error');
+}
+
+async function completeRide(){
+    const d=await api('/api/complete-ride',{method:'POST',body:{group_id:document.getElementById('grp').value}});
+    if(!d)return;
+    d.success?toast('Ride completed — trust +10 for all members','success'):toast(d.error||'Failed','error');
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+    document.getElementById('stu')?.addEventListener('change',()=>{
+        if(priorityGo){
+            priorityGo=false;
+            document.getElementById('priorityBtn').classList.remove('active');
+            document.getElementById('priorityInfo').classList.remove('show');
+        }
+    });
+});
+
+init();
+</script>
+{% endblock %}

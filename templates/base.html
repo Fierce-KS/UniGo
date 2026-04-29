@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}UniGo{% endblock %}</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+<nav class="nav">
+    <div class="nav-inner">
+        <a href="/" class="nav-brand"><div class="nav-logo">U</div> UniGo</a>
+        <ul class="nav-links">
+            <li><a href="/" class="nav-link {{ 'active' if active == 'dashboard' }}"><i data-lucide="layout-dashboard" style="width:14px;height:14px"></i> Dashboard</a></li>
+            <li><a href="/find" class="nav-link {{ 'active' if active == 'find' }}"><i data-lucide="search" style="width:14px;height:14px"></i> Find Rides</a></li>
+        </ul>
+        <div class="nav-right"><span class="dot"></span> Oracle 21c XE</div>
+    </div>
+</nav>
+<div class="page">{% block content %}{% endblock %}</div>
+<div class="toast-box" id="toasts"></div>
+<script>
+lucide.createIcons();
+function toast(msg,type){
+    const el=document.createElement('div');
+    el.className='toast '+(type||'info');
+    el.textContent=msg;
+    document.getElementById('toasts').appendChild(el);
+    setTimeout(()=>el.remove(),4000);
+}
+async function api(url,opts){
+    try{
+        const r=await fetch(url,{headers:{'Content-Type':'application/json'},...(opts||{}),body:opts&&opts.body?JSON.stringify(opts.body):undefined});
+        return await r.json();
+    }catch(e){toast('Connection error','error');return null;}
+}
+function trustBar(s){
+    const p=Math.min(s/200*100,100),c=s>=120?'high':s>=70?'mid':'low';
+    return '<div class="trust-wrap"><span>'+s+'</span><div class="trust-bar"><div class="trust-fill '+c+'" style="width:'+p+'%"></div></div></div>';
+}
+function badge(s){
+    const m={FORMING:'blue',COMPLETED:'green',PENDING:'yellow',ACTIVE:'blue',PAID:'green'};
+    return '<span class="badge badge-'+(m[s]||'gray')+'">'+s+'</span>';
+}
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
