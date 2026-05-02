@@ -1,12 +1,13 @@
 """
-UniGo — Module E: Frontend (E1_app.py)
-Routes only. Zero business logic.
+UniGo - Module E: Frontend (E1_app.py)
+Routes only. No business logic beyond wiring data to the UI.
 
 Depends on:
-  - Views: vw_students, vw_leaderboard, vw_destinations,
-           vw_ride_groups, vw_trust_audit, vw_available_rides  (Modules A/B/C)
-  - Procedures: book_ride, cancel_booking, complete_ride       (Module C)
-  - Functions: check_priority_eligibility, calculate_travel_risk (Module D)
+    - Views: vw_students, vw_leaderboard, vw_destinations,
+                     vw_ride_groups, vw_trust_audit, vw_available_rides,
+                     vw_student_bookings, vw_student_audit (Modules A/B/C)
+    - Procedures: book_ride, cancel_booking, complete_ride      (Module C)
+    - Functions: check_priority_eligibility, calculate_travel_risk (Module D)
 
 See reference/E2_views_contract.sql for expected view definitions.
 """
@@ -82,10 +83,38 @@ def a10():
     d = request.json
     return jsonify(proc("cancel_booking", [int(d["group_id"]), int(d["student_id"])]))
 
-@app.route("/api/complete-ride", methods=["POST"])
+@app.route("/api/create-group", methods=["POST"])
 def a11():
     d = request.json
+    # Hardcoding vehicle_id 1 (Sedan) for demo purposes. Mod C handles vehicle selection.
+    return jsonify(proc("create_ride_group", [int(d["destination_id"]), d["departure_date"], 1]))
+
+@app.route("/api/complete-ride", methods=["POST"])
+def a12():
+    d = request.json
     return jsonify(proc("complete_ride", [int(d["group_id"])]))
+
+# API - student-specific dashboard data
+@app.route("/api/student-bookings/<int:student_id>")
+def a13(student_id):
+    sql = """
+        SELECT group_id, city_name, departure_date, departure_time,
+               status, seat_capacity, seats_filled, payment_status
+        FROM vw_student_bookings
+        WHERE student_id = :a
+        ORDER BY departure_date, departure_time
+    """
+    return jsonify(q(sql, {"a": student_id}))
+
+@app.route("/api/student-audit/<int:student_id>")
+def a14(student_id):
+    sql = """
+        SELECT audit_id, old_score, new_score, reason, created_at
+        FROM vw_student_audit
+        WHERE student_id = :a
+        ORDER BY audit_id DESC
+    """
+    return jsonify(q(sql, {"a": student_id}))
 
 if __name__ == "__main__":
     print("\n  UniGo — http://localhost:5050\n")

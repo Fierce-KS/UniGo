@@ -8,24 +8,49 @@
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 </head>
 <body>
-<nav class="nav">
-    <div class="nav-inner">
-        <a href="/" class="nav-brand"><div class="nav-logo">U</div> UniGo</a>
-        <ul class="nav-links">
-            <li><a href="/" class="nav-link {{ 'active' if active == 'dashboard' }}"><i data-lucide="layout-dashboard" style="width:14px;height:14px"></i> Dashboard</a></li>
-            <li><a href="/find" class="nav-link {{ 'active' if active == 'find' }}"><i data-lucide="search" style="width:14px;height:14px"></i> Find Rides</a></li>
-        </ul>
-        <div class="nav-right"><span class="dot"></span> Oracle 21c XE</div>
+<div class="app-shell">
+    <aside class="sidebar">
+        <div class="side-brand">U</div>
+        <nav class="side-nav">
+            <a href="/" class="side-link {{ 'active' if active == 'dashboard' }}" title="Dashboard">
+                <i data-lucide="layout-dashboard" style="width:16px;height:16px"></i>
+            </a>
+            <a href="/find" class="side-link {{ 'active' if active == 'find' }}" title="Find Rides">
+                <i data-lucide="search" style="width:16px;height:16px"></i>
+            </a>
+        </nav>
+        <div class="side-footer">
+            <div class="side-dot"></div>
+        </div>
+    </aside>
+    <div class="app-main">
+        <header class="topbar">
+            <div class="topbar-left">
+                <div class="topbar-title">UniGo</div>
+                <div class="topbar-sub">
+                    {{ 'Dashboard' if active == 'dashboard' else 'Find Rides' }}
+                </div>
+            </div>
+            <div class="topbar-right">
+                <div class="nav-student">
+                    <label for="navStudent">Student</label>
+                    <select id="navStudent" class="nav-select"></select>
+                </div>
+                <div class="pill">Oracle 21c XE</div>
+            </div>
+        </header>
+        <div class="page">{% block content %}{% endblock %}</div>
     </div>
-</nav>
-<div class="page">{% block content %}{% endblock %}</div>
-<div class="toast-box" id="toasts"></div>
+</div>
+<div class="toast-box" id="toasts" role="status" aria-live="polite" aria-atomic="true"></div>
 <script>
 lucide.createIcons();
 function toast(msg,type){
     const el=document.createElement('div');
     el.className='toast '+(type||'info');
     el.textContent=msg;
+    el.setAttribute('role','status');
+    el.setAttribute('aria-live','polite');
     document.getElementById('toasts').appendChild(el);
     setTimeout(()=>el.remove(),4000);
 }
@@ -43,6 +68,59 @@ function badge(s){
     const m={FORMING:'blue',COMPLETED:'green',PENDING:'yellow',ACTIVE:'blue',PAID:'green'};
     return '<span class="badge badge-'+(m[s]||'gray')+'">'+s+'</span>';
 }
+
+let studentsCache = [];
+
+function getCurrentStudentId(){
+    return localStorage.getItem('unigo_student_id');
+}
+
+function getCurrentStudent(){
+    const id = getCurrentStudentId();
+    return studentsCache.find(s => String(s.student_id) === String(id));
+}
+
+function setCurrentStudentId(id){
+    localStorage.setItem('unigo_student_id', String(id));
+    document.dispatchEvent(new CustomEvent('student:change', {detail: {studentId: String(id)}}));
+}
+
+function renderStudentOptions(list){
+    const sel = document.getElementById('navStudent');
+    if(!sel || !list || !list.length) return;
+    sel.innerHTML = list.map(s => '<option value="'+s.student_id+'">'+s.name+' (Trust '+s.trust_score+')</option>').join('');
+
+    let saved = getCurrentStudentId();
+    if(!saved || !list.find(s => String(s.student_id) === String(saved))){
+        saved = String(list[0].student_id);
+    }
+
+    sel.value = saved;
+    localStorage.setItem('unigo_student_id', String(saved));
+}
+
+async function refreshStudents(){
+    const list = await api('/api/students');
+    if(!list || !list.length) return;
+    studentsCache = list;
+    renderStudentOptions(list);
+}
+
+async function initStudentSelector(){
+    const sel = document.getElementById('navStudent');
+    if(!sel) return;
+
+    const list = await api('/api/students');
+    if(!list || !list.length) return;
+    studentsCache = list;
+    renderStudentOptions(list);
+    const saved = getCurrentStudentId();
+    document.dispatchEvent(new CustomEvent('student:ready', {detail: {studentId: String(saved), students: list}}));
+
+    sel.addEventListener('change', (e) => setCurrentStudentId(e.target.value));
+}
+
+document.addEventListener('DOMContentLoaded', initStudentSelector);
 </script>
 {% block scripts %}{% endblock %}
 </body>

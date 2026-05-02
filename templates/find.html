@@ -4,40 +4,63 @@
 <h1 class="page-title">Find Rides</h1>
 <p class="page-sub">Search for ride groups, book seats, and manage bookings</p>
 
-<div class="card">
-    <div class="card-head"><i data-lucide="search" style="width:14px;height:14px"></i> Search & Book</div>
-    <div class="card-body pad">
-        <div class="form-row">
-            <div class="form-group"><label class="form-label">Your Name</label><select class="form-select" id="stu"></select></div>
-            <div class="form-group"><label class="form-label">Destination</label><select class="form-select" id="dest"></select></div>
-            <div class="form-group"><label class="form-label">Travel Date</label><input type="date" class="form-input" id="date" value="2026-05-01"></div>
-            <div class="form-group"><label class="form-label">Luggage (bags)</label><input type="number" class="form-input" id="lug" value="1" min="0" max="5"></div>
-        </div>
-
-        <div style="margin-bottom:16px">
-            <button type="button" class="priority-toggle" id="priorityBtn" onclick="togglePriority()">
-                <span class="toggle-dot"></span>
-                <i data-lucide="zap" style="width:14px;height:14px"></i> PriorityGo
-            </button>
-            <div class="priority-info" id="priorityInfo">
-                <strong>PriorityGo — Guaranteed Ride</strong><br>
-                Pay upfront and get a <strong>guaranteed seat</strong>. Your payment is locked in immediately — no cancellations allowed.<br>
-                <em>Requires trust score of 90 or higher.</em> Students who consistently follow through on their commitments earn this privilege.
+<div class="find-grid">
+    <div class="card">
+        <div class="card-head"><i data-lucide="search" style="width:14px;height:14px"></i> Search & Book</div>
+        <div class="card-body pad">
+            <div class="form-row">
+                <div class="form-group">
+                    <label class="form-label">Student</label>
+                    <div class="form-readonly" id="currentStudent">Loading...</div>
+                </div>
+                <div class="form-group"><label class="form-label">Destination</label><select class="form-select" id="dest"></select></div>
+                <div class="form-group"><label class="form-label">Travel Date</label><input type="date" class="form-input" id="date" value="2026-05-01"></div>
+                <div class="form-group"><label class="form-label">Luggage (bags)</label><input type="number" class="form-input" id="lug" value="1" min="0" max="5"></div>
             </div>
-        </div>
 
-        <div class="action-row">
-            <button class="btn btn-green" onclick="findRides()"><i data-lucide="search" style="width:14px;height:14px"></i> Find Matches</button>
-            <button class="btn btn-black" onclick="bookRide()"><i data-lucide="ticket" style="width:14px;height:14px"></i> Book Selected</button>
-            <button class="btn btn-danger" onclick="cancelBooking()"><i data-lucide="x" style="width:14px;height:14px"></i> Cancel Booking</button>
-            <button class="btn btn-outline" onclick="completeRide()"><i data-lucide="check" style="width:14px;height:14px"></i> Complete Ride</button>
+            <div style="margin-bottom:16px">
+                <button type="button" class="priority-toggle" id="priorityBtn" onclick="togglePriority()">
+                    <span class="toggle-dot"></span>
+                    <i data-lucide="zap" style="width:14px;height:14px"></i> PriorityGo
+                </button>
+                <div class="priority-info" id="priorityInfo">
+                    <strong>PriorityGo — Guaranteed Ride</strong><br>
+                    Pay upfront and get a <strong>guaranteed seat</strong>. Your payment is locked in immediately — no cancellations allowed.<br>
+                    <em>Requires trust score of 90 or higher.</em> Students who consistently follow through on their commitments earn this privilege.
+                </div>
+            </div>
+
+            <div class="action-row">
+                <button class="btn btn-green" onclick="findRides()"><i data-lucide="search" style="width:14px;height:14px"></i> Find Matches</button>
+                <button class="btn btn-black" onclick="bookRide()"><i data-lucide="ticket" style="width:14px;height:14px"></i> Book Selected</button>
+                <button class="btn btn-danger" onclick="cancelBooking()"><i data-lucide="x" style="width:14px;height:14px"></i> Cancel Booking</button>
+                <button class="btn btn-outline btn-admin" onclick="completeRide()"><i data-lucide="check" style="width:14px;height:14px"></i> Admin: Complete Ride</button>
+            </div>
+            <div class="muted admin-note">Admin/demo action. Requires group size >= 3.</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-head">
+            <span><i data-lucide="shield-alert" style="width:14px;height:14px"></i> Travel Risk</span>
+            <button class="btn btn-outline btn-mini" type="button" onclick="syncRiskFromSearch(true)">Use Booking Values</button>
+        </div>
+        <div class="card-body pad">
+            <p class="muted">Defaults to your booking destination. Adjust if you want to test a different connection.</p>
+            <div class="form-row">
+                <div class="form-group"><label class="form-label">Destination</label><select class="form-select" id="rDest"></select></div>
+                <div class="form-group"><label class="form-label">Connection time (hrs)</label><input type="number" class="form-input" id="rTime" value="6" min="0" max="24" step="0.5"></div>
+                <div class="form-group"><label class="form-label">Buffer</label><input type="number" class="form-input" id="rBuf" value="1.3" min="1" max="3" step="0.1"></div>
+            </div>
+            <button class="btn btn-black" onclick="calcRisk()">Calculate Risk</button>
+            <div class="risk-result" id="riskRes"><div class="risk-level" id="riskLvl"></div><div class="risk-detail" id="riskDet"></div></div>
         </div>
     </div>
 </div>
 
 <div id="results" style="display:none">
     <div class="card">
-        <div class="card-head"><span id="resultTitle">Matches</span></div>
+        <div class="card-head"><span id="resultTitle">Matches</span><span class="muted">Click a row to select</span></div>
         <div class="card-body"><div class="table-wrap" id="matchTable"></div></div>
     </div>
 </div>
@@ -55,18 +78,65 @@
 {% block scripts %}
 <script>
 let priorityGo = false;
+let lastSearch = null;
+let selectedGroupId = null;
+let groupsCache = [];
+let dests = [];
+let riskManual = false;
+
+function renderStudent(){
+    const s = getCurrentStudent();
+    const el = document.getElementById('currentStudent');
+    if(!el) return;
+    if(!s){
+        el.textContent = 'Select a student';
+        return;
+    }
+    const trustClass = s.trust_score >= 90 ? 'badge-green' : s.trust_score >= 70 ? 'badge-yellow' : 'badge-red';
+    el.innerHTML = '<div class="student-pill"><span class="student-name">'+s.name+'</span><span class="badge '+trustClass+'">Trust '+s.trust_score+'</span></div>';
+}
+
+function renderGroupSelect(grps){
+    const sel = document.getElementById('grp');
+    if(!sel) return;
+    if(!grps || !grps.length){
+        sel.innerHTML = '<option value="">No groups</option>';
+        selectedGroupId = null;
+        return;
+    }
+    sel.innerHTML = grps.map(g=>'<option value="'+g.group_id+'">Group '+g.group_id+' > '+g.city_name+' ('+g.seats_filled+'/'+g.seat_capacity+') ['+g.status+']</option>').join('');
+    if(selectedGroupId && grps.find(g => String(g.group_id) === String(selectedGroupId))){
+        sel.value = selectedGroupId;
+    } else {
+        selectedGroupId = sel.value;
+    }
+}
 
 async function init(){
-    const [stu,dests,grps] = await Promise.all([api('/api/students'),api('/api/destinations'),api('/api/ride-groups')]);
-    if(!stu)return;
+    renderStudent();
+    const [ds,grps] = await Promise.all([api('/api/destinations'),api('/api/ride-groups')]);
+    dests = ds || [];
+    document.getElementById('dest').innerHTML=dests.map(d=>'<option value="'+d.destination_id+'">'+d.city_name+'</option>').join('');
+    document.getElementById('rDest').innerHTML=dests.map(d=>'<option value="'+d.destination_id+'">'+d.city_name+' ('+d.avg_travel_hours+'h)</option>').join('');
+    syncRiskFromSearch(true);
 
-    document.getElementById('stu').innerHTML=stu.map(s=>{
-        return '<option value="'+s.student_id+'" data-trust="'+s.trust_score+'">'+s.name+' (Trust: '+s.trust_score+')'+(s.trust_score>=90?' [PG]':'')+'</option>';
-    }).join('');
+    groupsCache = grps || [];
+    renderGroupSelect(groupsCache);
+}
 
-    document.getElementById('dest').innerHTML=(dests||[]).map(d=>'<option value="'+d.destination_id+'">'+d.city_name+'</option>').join('');
+function syncRiskFromSearch(force){
+    if(force){
+        riskManual = false;
+    }
+    if(riskManual && !force) return;
+    const destVal = document.getElementById('dest')?.value;
+    if(destVal){
+        document.getElementById('rDest').value = destVal;
+    }
+}
 
-    document.getElementById('grp').innerHTML=(grps||[]).map(g=>'<option value="'+g.group_id+'">Group '+g.group_id+' > '+g.city_name+' ('+g.seats_filled+'/'+g.seat_capacity+') ['+g.status+']</option>').join('');
+function markRiskManual(){
+    riskManual = true;
 }
 
 async function togglePriority(){
@@ -75,7 +145,11 @@ async function togglePriority(){
 
     if(!priorityGo){
         // Call DB function to check eligibility
-        const sid = document.getElementById('stu').value;
+        const sid = getCurrentStudentId();
+        if(!sid){
+            toast('Select a student first','error');
+            return;
+        }
         const d = await api('/api/priority-check',{method:'POST',body:{student_id: sid}});
         if(!d) return;
 
@@ -94,66 +168,260 @@ async function togglePriority(){
     }
 }
 
-async function findRides(){
-    const data = await api('/api/find-buddies',{method:'POST',body:{
-        destination_id:document.getElementById('dest').value,
-        travel_date:document.getElementById('date').value,
+async function findRides(useLast){
+    const dateVal = document.getElementById('date').value;
+    const destVal = document.getElementById('dest').value;
+    if(!useLast){
+        if(!dateVal || !destVal){
+            toast('Select destination and date','error');
+            return;
+        }
+    }
+    const payload = (useLast && lastSearch) ? lastSearch : {
+        destination_id:destVal,
+        travel_date:dateVal,
         luggage_count:document.getElementById('lug').value
-    }});
+    };
+    if(!useLast){
+        lastSearch = payload;
+    }
+    const data = await api('/api/find-buddies',{method:'POST',body:payload});
     if(!data)return;
     if(data.error){toast(data.error,'error');return;}
 
     document.getElementById('results').style.display='block';
     document.getElementById('resultTitle').textContent=data.count+' Match'+(data.count!==1?'es':'') + (priorityGo?' — PriorityGo':'');
 
+    if(data.count === 0) {
+        document.getElementById('matchTable').innerHTML=`
+            <div style="padding:24px;text-align:center;color:var(--text-secondary)">
+                <p style="margin-bottom:12px">No ride groups are heading there on that date.</p>
+                <button class="btn btn-outline" onclick="createGroup()">Create New Ride Group</button>
+            </div>
+        `;
+        toast('No matches found','info');
+        return;
+    }
+
     let h='<table><thead><tr><th>Group</th><th>Destination</th><th>Date</th><th>Departs</th><th>Seats</th><th>Bags</th>'+(priorityGo?'<th>Guarantee</th>':'')+'</tr></thead><tbody>';
     data.matches.forEach(m=>{
-        h+='<tr><td>'+m.group_id+'</td><td>'+m.city_name+'</td><td>'+m.departure_date+'</td><td>'+m.departure_time+'</td><td><span class="badge badge-green">'+m.available_seats+'</span></td><td><span class="badge badge-blue">'+m.available_bag_space+'</span></td>';
+        h+='<tr class="row-selectable" data-group-id="'+m.group_id+'" data-destination-id="'+m.destination_id+'"><td>#'+m.group_id+'</td><td>'+m.city_name+'</td><td>'+m.departure_date+'</td><td>'+m.departure_time+'</td><td><span class="badge badge-green">'+m.available_seats+'</span></td><td><span class="badge badge-blue">'+m.available_bag_space+'</span></td>';
         if(priorityGo) h+='<td><span class="badge badge-green">Guaranteed</span></td>';
         h+='</tr>';
     });
     document.getElementById('matchTable').innerHTML=h+'</tbody></table>';
+    selectedGroupId = null;
+    document.querySelectorAll('#matchTable tbody tr').forEach(tr => {
+        tr.setAttribute('tabindex','0');
+        tr.setAttribute('role','button');
+        tr.addEventListener('click', () => selectGroup(tr.dataset.groupId));
+        tr.addEventListener('keydown', (e) => {
+            if(e.key === 'Enter' || e.key === ' '){
+                e.preventDefault();
+                selectGroup(tr.dataset.groupId);
+            }
+        });
+    });
     toast('Found '+data.count+' match(es)','success');
 }
 
+async function createGroup() {
+    const d = await api('/api/create-group',{method:'POST',body:{
+        destination_id: document.getElementById('dest').value,
+        departure_date: document.getElementById('date').value
+    }});
+    if(!d)return;
+    if(d.success){
+        toast('New ride group created! You can now search again and book it.','success');
+        await refreshAfterAction();
+    } else {
+        toast(d.error||'Failed to create group','error');
+    }
+}
+
+function selectGroup(id){
+    selectedGroupId = String(id);
+    document.querySelectorAll('#matchTable tbody tr').forEach(tr => {
+        tr.classList.toggle('row-selected', tr.dataset.groupId === selectedGroupId);
+        if(tr.dataset.groupId === selectedGroupId && tr.dataset.destinationId){
+            document.getElementById('rDest').value = tr.dataset.destinationId;
+            riskManual = false;
+        }
+    });
+    const sel = document.getElementById('grp');
+    if(sel) sel.value = selectedGroupId;
+}
+
+function syncSelectionFromDropdown(){
+    const sel = document.getElementById('grp');
+    if(!sel) return;
+    selectedGroupId = sel.value || null;
+    document.querySelectorAll('#matchTable tbody tr').forEach(tr => {
+        tr.classList.toggle('row-selected', tr.dataset.groupId === selectedGroupId);
+    });
+
+    const group = (groupsCache || []).find(g => String(g.group_id) === String(selectedGroupId));
+    if(group && dests && dests.length){
+        const match = dests.find(d => d.city_name === group.city_name);
+        if(match){
+            document.getElementById('rDest').value = match.destination_id;
+            riskManual = false;
+        }
+    }
+}
+
+async function refreshGroups(){
+    groupsCache = await api('/api/ride-groups');
+    renderGroupSelect(groupsCache || []);
+}
+
+async function refreshAfterAction(){
+    await refreshGroups();
+    if(typeof refreshStudents === 'function'){
+        await refreshStudents();
+        renderStudent();
+    }
+    if(lastSearch){
+        await findRides(true);
+    }
+}
+
 async function bookRide(){
+    const sid = getCurrentStudentId();
+    if(!sid){
+        toast('Select a student first','error');
+        return;
+    }
+    const groupId = selectedGroupId || document.getElementById('grp').value;
+    if(!groupId){
+        toast('Select a ride group first','error');
+        return;
+    }
+
+    syncRiskFromSearch(true);
+
+    const group = (groupsCache || []).find(g => String(g.group_id) === String(groupId));
+    if(group){
+        if(String(group.status) !== 'FORMING'){
+            toast('This group is not open for booking','error');
+            return;
+        }
+        if(Number(group.seats_filled) >= Number(group.seat_capacity)){
+            toast('This group is already full','error');
+            return;
+        }
+    }
+
+    const myBookings = await api('/api/student-bookings/' + sid);
+    if(myBookings && myBookings.find(b => String(b.group_id) === String(groupId) && b.status !== 'COMPLETED')){
+        toast('You are already booked in this group','error');
+        return;
+    }
+
     const d = await api('/api/book',{method:'POST',body:{
-        group_id:document.getElementById('grp').value,
-        student_id:document.getElementById('stu').value,
+        group_id: groupId,
+        student_id: sid,
         luggage_count:document.getElementById('lug').value,
         priority_go: priorityGo
     }});
     if(!d)return;
     if(d.success){
-        toast(d.message,'success');
+        toast(d.message || 'Booked successfully','success');
+        await refreshAfterAction();
     } else {
         toast(d.error,'error');
+        await refreshGroups();
     }
 }
 
-async function cancelBooking(){
-    const d=await api('/api/cancel-booking',{method:'POST',body:{
-        group_id:document.getElementById('grp').value,
-        student_id:document.getElementById('stu').value
+async function calcRisk(){
+    const d=await api('/api/travel-risk',{method:'POST',body:{
+        destination_id:document.getElementById('rDest').value,
+        connection_time:document.getElementById('rTime').value,
+        buffer_factor:document.getElementById('rBuf').value
     }});
     if(!d)return;
-    d.success?toast('Cancelled — trust penalty applied (-15)','info'):toast(d.error||'Failed','error');
+    const l=d.risk_level,c=l==='SAFE'?'safe':l==='RISKY'?'risky':'critical';
+    const el=document.getElementById('riskRes');
+    el.className='risk-result show '+c;
+    document.getElementById('riskLvl').className='risk-level '+c;
+    document.getElementById('riskLvl').textContent=l;
+    const dest=dests.find(x=>String(x.destination_id)===String(document.getElementById('rDest').value));
+    const req=(dest.avg_travel_hours*parseFloat(document.getElementById('rBuf').value)).toFixed(1);
+    document.getElementById('riskDet').textContent=dest.avg_travel_hours+'h x '+document.getElementById('rBuf').value+' = '+req+'h required | You have '+document.getElementById('rTime').value+'h';
+}
+
+async function cancelBooking(){
+    const sid = getCurrentStudentId();
+    if(!sid){
+        toast('Select a student first','error');
+        return;
+    }
+    const groupId = selectedGroupId || document.getElementById('grp').value;
+    if(!groupId){
+        toast('Select a ride group first','error');
+        return;
+    }
+    if(!confirm('Cancel this booking? Trust penalty may apply.')) return;
+    const d=await api('/api/cancel-booking',{method:'POST',body:{
+        group_id: groupId,
+        student_id: sid
+    }});
+    if(!d)return;
+    if(d.success){
+        toast('Cancelled — trust penalty applied (-15)','info');
+        await refreshAfterAction();
+    } else {
+        toast(d.error||'Failed','error');
+        await refreshGroups();
+    }
 }
 
 async function completeRide(){
-    const d=await api('/api/complete-ride',{method:'POST',body:{group_id:document.getElementById('grp').value}});
+    const groupId = selectedGroupId || document.getElementById('grp').value;
+    if(!groupId){
+        toast('Select a ride group first','error');
+        return;
+    }
+    if(!confirm('Complete this ride? This is an admin/demo action.')) return;
+    const d=await api('/api/complete-ride',{method:'POST',body:{group_id: groupId}});
     if(!d)return;
-    d.success?toast('Ride completed — trust +10 for all members','success'):toast(d.error||'Failed','error');
+    if(d.success){
+        toast('Ride completed — trust +10 for all members','success');
+        await refreshAfterAction();
+    } else {
+        toast(d.error||'Failed','error');
+        await refreshGroups();
+    }
 }
 
+document.addEventListener('student:ready', renderStudent);
+
 document.addEventListener('DOMContentLoaded',()=>{
-    document.getElementById('stu')?.addEventListener('change',()=>{
+    const destSel = document.getElementById('dest');
+    if(destSel){
+        destSel.addEventListener('change', () => syncRiskFromSearch(false));
+    }
+
+    const rDest = document.getElementById('rDest');
+    const rTime = document.getElementById('rTime');
+    const rBuf = document.getElementById('rBuf');
+    if(rDest) rDest.addEventListener('change', markRiskManual);
+    if(rTime) rTime.addEventListener('change', markRiskManual);
+    if(rBuf) rBuf.addEventListener('change', markRiskManual);
+
+    document.addEventListener('student:change',()=>{
+        renderStudent();
         if(priorityGo){
             priorityGo=false;
             document.getElementById('priorityBtn').classList.remove('active');
             document.getElementById('priorityInfo').classList.remove('show');
         }
     });
+    const sel = document.getElementById('grp');
+    if(sel){
+        sel.addEventListener('change', syncSelectionFromDropdown);
+    }
 });
 
 init();

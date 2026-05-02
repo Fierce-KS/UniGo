@@ -1,37 +1,56 @@
 {% extends "base.html" %}
-{% block title %}UniGo — Dashboard{% endblock %}
+{% block title %}UniGo — My Dashboard{% endblock %}
 {% block content %}
-<h1 class="page-title">Dashboard</h1>
-<p class="page-sub">Students, trust scores, ride groups, and audit trail</p>
-
-<div class="stats" id="stats"><div class="spinner"></div></div>
+<h1 class="page-title">My Dashboard</h1>
+<p class="page-sub">Personal snapshot, bookings, and trust activity</p>
 
 <div class="sections">
     <div>
         <div class="card">
-            <div class="card-head"><i data-lucide="trophy" style="width:14px;height:14px"></i> Trust Leaderboard</div>
-            <div class="card-body"><div class="table-wrap" id="leaders"><div class="spinner"></div></div></div>
+            <div class="card-head"><i data-lucide="user" style="width:14px;height:14px"></i> Student Snapshot</div>
+            <div class="card-body pad">
+                <div class="profile">
+                    <div class="profile-main">
+                        <div class="profile-name" id="sName">Loading...</div>
+                        <div class="profile-meta" id="sMeta"></div>
+                    </div>
+                    <div class="profile-metrics">
+                        <div class="metric">
+                            <div class="metric-label">Trust Score</div>
+                            <div class="metric-value" id="sTrust"></div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">Total Rides</div>
+                            <div class="metric-value" id="sRides"></div>
+                        </div>
+                        <div class="metric">
+                            <div class="metric-label">PriorityGo</div>
+                            <div class="metric-value" id="sPriority"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
+
         <div class="card">
-            <div class="card-head"><i data-lucide="car" style="width:14px;height:14px"></i> Ride Groups <button class="btn btn-outline" onclick="loadGroups()" style="font-size:11px;padding:4px 10px"><i data-lucide="refresh-cw" style="width:12px;height:12px"></i></button></div>
-            <div class="card-body"><div class="table-wrap" id="groups"><div class="spinner"></div></div></div>
+            <div class="card-head"><i data-lucide="calendar-check" style="width:14px;height:14px"></i> Active Booking</div>
+            <div class="card-body"><div class="table-wrap" id="myBookings"><div class="spinner"></div></div></div>
         </div>
     </div>
     <div>
         <div class="card">
-            <div class="card-head"><i data-lucide="scroll-text" style="width:14px;height:14px"></i> Trust Audit Log <button class="btn btn-outline" onclick="loadAudit()" style="font-size:11px;padding:4px 10px"><i data-lucide="refresh-cw" style="width:12px;height:12px"></i></button></div>
-            <div class="card-body"><div class="table-wrap" id="audit"><div class="spinner"></div></div></div>
+            <div class="card-head"><i data-lucide="activity" style="width:14px;height:14px"></i> Recent Trust Activity</div>
+            <div class="card-body"><div class="table-wrap" id="myAudit"><div class="spinner"></div></div></div>
         </div>
         <div class="card">
-            <div class="card-head"><i data-lucide="shield-alert" style="width:14px;height:14px"></i> Travel Risk Calculator</div>
+            <div class="card-head"><i data-lucide="sparkles" style="width:14px;height:14px"></i> Quick Actions</div>
             <div class="card-body pad">
-                <div class="form-row">
-                    <div class="form-group"><label class="form-label">Destination</label><select class="form-select" id="rDest"></select></div>
-                    <div class="form-group"><label class="form-label">Connection time (hrs)</label><input type="number" class="form-input" id="rTime" value="6" min="0" max="24" step="0.5"></div>
-                    <div class="form-group"><label class="form-label">Buffer</label><input type="number" class="form-input" id="rBuf" value="1.3" min="1" max="3" step="0.1"></div>
+                <p class="muted">Find matching ride groups or check your PriorityGo eligibility.</p>
+                <div class="action-row">
+                    <a class="btn btn-green" href="/find"><i data-lucide="search" style="width:14px;height:14px"></i> Find Rides</a>
+                    <button class="btn btn-outline" onclick="checkPriority()"><i data-lucide="zap" style="width:14px;height:14px"></i> Check PriorityGo</button>
                 </div>
-                <button class="btn btn-black" onclick="calcRisk()">Calculate Risk</button>
-                <div class="risk-result" id="riskRes"><div class="risk-level" id="riskLvl"></div><div class="risk-detail" id="riskDet"></div></div>
+                <div class="priority-check" id="priorityCheck"></div>
             </div>
         </div>
     </div>
@@ -40,69 +59,95 @@
 
 {% block scripts %}
 <script>
-let dests=[];
+function renderBookings(list){
+    const el = document.getElementById('myBookings');
+    const active = (list || []).filter(b => b.status !== 'COMPLETED');
+    if(!active.length){
+        el.innerHTML = '<div class="empty">No active bookings</div>';
+        return;
+    }
 
-async function loadAll(){
-    const [stu,leaders,groups,audit,ds] = await Promise.all([
-        api('/api/students'),api('/api/leaderboard'),api('/api/ride-groups'),api('/api/trust-audit'),api('/api/destinations')
+    let h = '<table><thead><tr><th>Group</th><th>Destination</th><th>Date</th><th>Time</th><th>Seats</th><th>Status</th><th>Payment</th></tr></thead><tbody>';
+    active.forEach(b => {
+        h += '<tr>'+
+            '<td>#'+b.group_id+'</td>'+
+            '<td>'+b.city_name+'</td>'+
+            '<td>'+b.departure_date+'</td>'+
+            '<td>'+b.departure_time+'</td>'+
+            '<td>'+b.seats_filled+'/'+b.seat_capacity+'</td>'+
+            '<td>'+badge(b.status)+'</td>'+
+            '<td>'+badge(b.payment_status)+'</td>'+
+        '</tr>';
+    });
+    el.innerHTML = h + '</tbody></table>';
+}
+
+function renderAudit(list){
+    const el = document.getElementById('myAudit');
+    const items = (list || []).slice(0, 5);
+    if(!items.length){
+        el.innerHTML = '<div class="empty">No recent trust activity</div>';
+        return;
+    }
+
+    let h = '<table><thead><tr><th>When</th><th>Change</th><th>Reason</th></tr></thead><tbody>';
+    items.forEach(r => {
+        const d = r.new_score - r.old_score;
+        const cls = d >= 0 ? 'up' : 'down';
+        const arrow = d >= 0 ? '+' : '-';
+        h += '<tr>'+
+            '<td>'+r.created_at+'</td>'+
+            '<td><span class="delta '+cls+'">'+r.old_score+' -> '+r.new_score+' ('+arrow+Math.abs(d)+')</span></td>'+
+            '<td style="color:var(--text-secondary)">'+r.reason+'</td>'+
+        '</tr>';
+    });
+    el.innerHTML = h + '</tbody></table>';
+}
+
+async function checkPriority(){
+    const sid = getCurrentStudentId();
+    if(!sid) return;
+    const d = await api('/api/priority-check', {method:'POST', body:{student_id: sid}});
+    if(!d) return;
+    const el = document.getElementById('priorityCheck');
+    const ok = d.status === 'ELIGIBLE';
+    el.className = 'priority-check ' + (ok ? 'ok' : 'warn');
+    el.textContent = ok ? 'PriorityGo eligible - you can pay upfront for a guaranteed seat.' : d.status.replace('NOT_ELIGIBLE:','Trust score ');
+}
+
+async function loadDashboard(){
+    const sid = getCurrentStudentId();
+    if(!sid) return;
+
+    const studentsPromise = (typeof studentsCache !== 'undefined' && studentsCache.length) ? Promise.resolve(studentsCache) : api('/api/students');
+    const [students, bookings, audit] = await Promise.all([
+        studentsPromise,
+        api('/api/student-bookings/' + sid),
+        api('/api/student-audit/' + sid)
     ]);
-    if(!stu)return;
-    dests=ds||[];
 
-    const avg=(stu.reduce((a,s)=>a+s.trust_score,0)/stu.length).toFixed(1);
-    const rides=stu.reduce((a,s)=>a+s.total_rides,0);
-    const pg=stu.filter(s=>s.trust_score>=90).length;
-    document.getElementById('stats').innerHTML=
-        '<div class="stat"><div class="stat-label">Students</div><div class="stat-val">'+stu.length+'</div></div>'+
-        '<div class="stat"><div class="stat-label">Avg Trust</div><div class="stat-val green">'+avg+'</div></div>'+
-        '<div class="stat"><div class="stat-label">Total Rides</div><div class="stat-val">'+rides+'</div></div>'+
-        '<div class="stat"><div class="stat-label">PriorityGo Eligible</div><div class="stat-val green">'+pg+'</div></div>';
+    if(!students || !students.length) return;
+    if(typeof renderStudentOptions === 'function'){
+        if(typeof studentsCache !== 'undefined'){
+            studentsCache = students;
+        }
+        renderStudentOptions(students);
+    }
+    const me = students.find(s => String(s.student_id) === String(sid));
+    if(!me) return;
 
-    let h='<table><thead><tr><th>Rank</th><th>Name</th><th>Trust</th><th>Rides</th></tr></thead><tbody>';
-    leaders.forEach(r=>{
-        const rc=r.trust_rank<=3?'rank-'+r.trust_rank:'rank-n';
-        h+='<tr><td><span class="rank '+rc+'">'+r.trust_rank+'</span></td><td>'+r.name+(r.trust_score>=90?' <span class="badge badge-green">PriorityGo</span>':'')+'</td><td>'+trustBar(r.trust_score)+'</td><td>'+r.total_rides+'</td></tr>';
-    });
-    document.getElementById('leaders').innerHTML=h+'</tbody></table>';
+    document.getElementById('sName').textContent = me.name;
+    document.getElementById('sMeta').textContent = 'Student #' + me.student_id + (me.email ? ' | ' + me.email : '');
+    document.getElementById('sTrust').innerHTML = trustBar(me.trust_score);
+    document.getElementById('sRides').textContent = me.total_rides;
+    document.getElementById('sPriority').innerHTML = me.trust_score >= 90 ? '<span class="badge badge-green">Eligible</span>' : '<span class="badge badge-gray">Not eligible</span>';
 
-    renderGroups(groups);
+    renderBookings(bookings);
     renderAudit(audit);
-    document.getElementById('rDest').innerHTML=dests.map(d=>'<option value="'+d.destination_id+'">'+d.city_name+' ('+d.avg_travel_hours+'h)</option>').join('');
 }
 
-function renderGroups(data){
-    if(!data||!data.length){document.getElementById('groups').innerHTML='<div class="empty">No groups</div>';return;}
-    let h='<table><thead><tr><th>ID</th><th>Dest</th><th>Seats</th><th>Status</th></tr></thead><tbody>';
-    data.forEach(g=>{h+='<tr><td>'+g.group_id+'</td><td>'+g.city_name+'</td><td>'+g.seats_filled+'/'+g.seat_capacity+'</td><td>'+badge(g.status)+'</td></tr>';});
-    document.getElementById('groups').innerHTML=h+'</tbody></table>';
-}
-
-function renderAudit(data){
-    if(!data||!data.length){document.getElementById('audit').innerHTML='<div class="empty">No audit entries</div>';return;}
-    let h='<table><thead><tr><th>Student</th><th>Change</th><th>Reason</th></tr></thead><tbody>';
-    data.forEach(r=>{
-        const d=r.new_score-r.old_score, cls=d>=0?'up':'down', arrow=d>=0?'+':'-';
-        h+='<tr><td>'+r.name+'</td><td><span class="delta '+cls+'">'+r.old_score+' → '+r.new_score+' ('+arrow+Math.abs(d)+')</span></td><td style="color:var(--text-secondary)">'+r.reason+'</td></tr>';
-    });
-    document.getElementById('audit').innerHTML=h+'</tbody></table>';
-}
-
-async function loadGroups(){renderGroups(await api('/api/ride-groups'));}
-async function loadAudit(){renderAudit(await api('/api/trust-audit'));}
-
-async function calcRisk(){
-    const d=await api('/api/travel-risk',{method:'POST',body:{destination_id:document.getElementById('rDest').value,connection_time:document.getElementById('rTime').value,buffer_factor:document.getElementById('rBuf').value}});
-    if(!d)return;
-    const l=d.risk_level,c=l==='SAFE'?'safe':l==='RISKY'?'risky':'critical';
-    const el=document.getElementById('riskRes');
-    el.className='risk-result show '+c;
-    document.getElementById('riskLvl').className='risk-level '+c;
-    document.getElementById('riskLvl').textContent=l;
-    const dest=dests.find(x=>x.destination_id==document.getElementById('rDest').value);
-    const req=(dest.avg_travel_hours*parseFloat(document.getElementById('rBuf').value)).toFixed(1);
-    document.getElementById('riskDet').textContent=dest.avg_travel_hours+'h x '+document.getElementById('rBuf').value+' = '+req+'h required | You have '+document.getElementById('rTime').value+'h';
-}
-
-loadAll();
+document.addEventListener('student:ready', loadDashboard);
+document.addEventListener('student:change', loadDashboard);
+loadDashboard();
 </script>
 {% endblock %}

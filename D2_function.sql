@@ -103,5 +103,37 @@ END check_priority_eligibility;
 /
 
 -- =============================================================================
+-- PROCEDURE: log_trust_change
+--
+-- Purpose:
+--   Inserts a trust audit record. This is called by Module C triggers to
+--   avoid direct cross-module writes to Trust_Audit_Log.
+-- =============================================================================
+CREATE OR REPLACE PROCEDURE log_trust_change (
+    p_student_id IN NUMBER,
+    p_old_score  IN Trust_Audit_Log.old_score%TYPE,
+    p_new_score  IN Trust_Audit_Log.new_score%TYPE,
+    p_reason     IN Trust_Audit_Log.reason%TYPE
+) AS
+BEGIN
+    INSERT INTO Trust_Audit_Log (
+        audit_id,
+        student_id,
+        old_score,
+        new_score,
+        reason,
+        created_at
+    ) VALUES (
+        trust_audit_seq.NEXTVAL,
+        p_student_id,
+        p_old_score,
+        p_new_score,
+        p_reason,
+        SYSDATE
+    );
+END log_trust_change;
+/
+
+-- =============================================================================
 -- End of D2_function.sql
 -- =============================================================================
