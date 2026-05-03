@@ -1,0 +1,152 @@
+
+SQLcl: Release 26.1 Production on Sun May 03 18:10:38 2026
+
+Copyright (c) 1982, 2026, Oracle.  All rights reserved.
+
+Connected to:
+Oracle Database 21c Express Edition Release 21.0.0.0.0 - Production
+Version 21.3.0.0.0
+
+SQL> SELECT student_id, name, trust_score FROM Students ORDER BY student_id;
+
+   STUDENT_ID NAME                 TRUST_SCORE 
+_____________ _________________ ______________ 
+         1001 Aanya Sharma                 100 
+         1002 Rohan Mehta                   95 
+         1003 Priya Kapoor                 110 
+         1004 Kabir Singh                   85 
+         1005 Sneha Reddy                   45 
+         1006 Arjun Nair                   100 
+         1007 Divya Patel                  120 
+         1008 Varun Gupta                   85 
+         1009 Meera Joshi                  110 
+         1010 Tanvir Hussain                90 
+
+10 rows selected. 
+
+SQL> SELECT group_id, status, seats_filled, total_luggage FROM Ride_Groups ORDER BY group_id;
+
+   GROUP_ID STATUS          SEATS_FILLED    TOTAL_LUGGAGE 
+___________ ____________ _______________ ________________ 
+        601 FORMING                    3                2 
+        602 COMPLETED                  2                1 
+        603 FORMING                    4                2 
+        604 COMPLETED                  4                2 
+        605 FORMING                    1                1 
+
+SQL> SELECT group_id, student_id FROM Group_Members ORDER BY group_id;
+
+   GROUP_ID    STUDENT_ID 
+___________ _____________ 
+        601          1003 
+        601          1006 
+        601          1007 
+        602          1004 
+        602          1009 
+        603          1002 
+        603          1007 
+        603          1008 
+        603          1010 
+        604          1001 
+        604          1003 
+        604          1007 
+        605          1002 
+
+13 rows selected. 
+
+SQL> SET SERVEROUTPUT ON;
+SQL> EXEC book_ride(601, 1001, 0);
+INFO: Group 601 is now LOCKED (full).
+SUCCESS: Student 1001 booked into group 601.
+
+
+PL/SQL procedure successfully completed.
+
+SQL> SELECT seats_filled FROM Ride_Groups WHERE group_id = 601;
+
+   SEATS_FILLED 
+_______________ 
+              4 
+
+SQL> SELECT * FROM Group_Members WHERE group_id = 601 AND student_id = 1001;
+
+   GROUP_ID    STUDENT_ID JOINED_AT                       PAYMENT_STATUS    
+___________ _____________ _______________________________ _________________ 
+        601          1001 03-MAY-26 18.11.00.306000000    PENDING           
+
+SQL> SET SERVEROUTPUT ON;
+SQL> SELECT trust_score FROM Students WHERE student_id = 1001;
+
+   TRUST_SCORE 
+______________ 
+           100 
+
+SQL> EXEC cancel_booking(601, 1001);
+INFO: Group 601 reopened to FORMING (seat freed).
+SUCCESS: Student 1001 removed from group 601. Trust penalty applied (-15).
+
+
+PL/SQL procedure successfully completed.
+
+SQL> SELECT trust_score FROM Students WHERE student_id = 1001;
+
+   TRUST_SCORE 
+______________ 
+            85 
+
+SQL> SELECT * FROM Trust_Audit_Log WHERE student_id = 1001 ORDER BY audit_id DESC;
+
+   AUDIT_ID    STUDENT_ID    OLD_SCORE    NEW_SCORE REASON                                       CHANGED_AT                      
+___________ _____________ ____________ ____________ ____________________________________________ _______________________________ 
+        805          1001          100           85 Booking cancelled ΓÇö group 601 (-15 trust)    03-MAY-26 18.11.31.984000000    
+
+SQL> 
+SQL> 
+SQL> 
+SQL> 
+SQL> SET SERVEROUTPUT ON;
+SQL> SELECT student_id, trust_score, total_rides FROM Students WHERE student_id IN (1002, 1005, 1008, 1010);
+
+   STUDENT_ID    TRUST_SCORE    TOTAL_RIDES 
+_____________ ______________ ______________ 
+         1002             95              4 
+         1005             45              1 
+         1008             85              5 
+         1010             90              6 
+
+SQL> EXEC complete_ride(603);
+SUCCESS: Group 603 completed. Trust +10 applied to 4 members.
+
+
+PL/SQL procedure successfully completed.
+
+SQL> SELECT student_id, trust_score, total_rides FROM Students WHERE student_id IN (1002, 1005, 1008, 1010);
+
+   STUDENT_ID    TRUST_SCORE    TOTAL_RIDES 
+_____________ ______________ ______________ 
+         1002            105              5 
+         1005             45              1 
+         1008             95              6 
+         1010            100              7 
+
+SQL> SELECT * FROM Trust_Audit_Log ORDER BY audit_id DESC;
+
+   AUDIT_ID    STUDENT_ID    OLD_SCORE    NEW_SCORE REASON                                       CHANGED_AT                      
+___________ _____________ ____________ ____________ ____________________________________________ _______________________________ 
+        809          1010           90          100 Ride completed ΓÇö group 603 (+10 trust)       03-MAY-26 18.12.17.848000000    
+        808          1008           85           95 Ride completed ΓÇö group 603 (+10 trust)       03-MAY-26 18.12.17.848000000    
+        807          1007          120          130 Ride completed ΓÇö group 603 (+10 trust)       03-MAY-26 18.12.17.848000000    
+        806          1002           95          105 Ride completed ΓÇö group 603 (+10 trust)       03-MAY-26 18.12.17.848000000    
+        805          1001          100           85 Booking cancelled ΓÇö group 601 (-15 trust)    03-MAY-26 18.11.31.984000000    
+        804          1005           60           45 Booking cancelled ΓÇö group 603 (-15 trust)    03-MAY-26 17.08.34.465000000    
+        803          1009          100          110 Ride completed ΓÇö group 602 (+10 trust)       03-MAY-26 17.02.14.133000000    
+        802          1004           75           85 Ride completed ΓÇö group 602 (+10 trust)       03-MAY-26 17.02.14.133000000    
+
+8 rows selected. 
+
+SQL> SET SERVEROUTPUT ON;
+SQL> EXEC book_ride(605, 1005, 0);
+FAILED: PriorityGo requires trust score >= 90. Student 1005 has trust score: 45
+
+
+PL/SQL procedure successfully completed.
