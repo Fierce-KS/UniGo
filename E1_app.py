@@ -14,7 +14,7 @@ See reference/E2_views_contract.sql for expected view definitions.
 from flask import Flask, render_template, jsonify, request
 import oracledb
 
-DB = {"user": "system", "password": "UniGo2026", "dsn": "localhost:1521/XEPDB1"}
+DB = {"user": "unigo", "password": "unigo123", "dsn": "localhost:1521/XEPDB1"}
 app = Flask(__name__)
 
 def q(sql, p=None):
@@ -76,7 +76,7 @@ def a8():
 @app.route("/api/book", methods=["POST"])
 def a9():
     d = request.json
-    return jsonify(proc("book_ride", [int(d["group_id"]), int(d["student_id"]), 1 if d.get("priority_go") else 0]))
+    return jsonify(proc("book_ride", [int(d["group_id"]), int(d["student_id"]), int(d.get("luggage_count", 0))])) #procedure signature changed, new updated args 
 
 @app.route("/api/cancel-booking", methods=["POST"])
 def a10():
