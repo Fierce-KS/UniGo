@@ -1,429 +1,660 @@
 {% extends "base.html" %}
 {% block title %}UniGo — Find Rides{% endblock %}
 {% block content %}
+
 <h1 class="page-title">Find Rides</h1>
-<p class="page-sub">Search for ride groups, book seats, and manage bookings</p>
+<p class="page-sub">Search for a ride, select one, and book your seat.</p>
 
-<div class="find-grid">
-    <div class="card">
-        <div class="card-head"><i data-lucide="search" style="width:14px;height:14px"></i> Search & Book</div>
-        <div class="card-body pad">
-            <div class="form-row">
-                <div class="form-group">
-                    <label class="form-label">Student</label>
-                    <div class="form-readonly" id="currentStudent">Loading...</div>
-                </div>
-                <div class="form-group"><label class="form-label">Destination</label><select class="form-select" id="dest"></select></div>
-                <div class="form-group"><label class="form-label">Travel Date</label><input type="date" class="form-input" id="date" value="2026-05-01"></div>
-                <div class="form-group"><label class="form-label">Luggage (bags)</label><input type="number" class="form-input" id="lug" value="1" min="0" max="5"></div>
-            </div>
-
-            <div style="margin-bottom:16px">
-                <button type="button" class="priority-toggle" id="priorityBtn" onclick="togglePriority()">
-                    <span class="toggle-dot"></span>
-                    <i data-lucide="zap" style="width:14px;height:14px"></i> PriorityGo
-                </button>
-                <div class="priority-info" id="priorityInfo">
-                    <strong>PriorityGo — Guaranteed Ride</strong><br>
-                    Pay upfront and get a <strong>guaranteed seat</strong>. Your payment is locked in immediately — no cancellations allowed.<br>
-                    <em>Requires trust score of 90 or higher.</em> Students who consistently follow through on their commitments earn this privilege.
-                </div>
-            </div>
-
-            <div class="action-row">
-                <button class="btn btn-green" onclick="findRides()"><i data-lucide="search" style="width:14px;height:14px"></i> Find Matches</button>
-                <button class="btn btn-black" onclick="bookRide()"><i data-lucide="ticket" style="width:14px;height:14px"></i> Book Selected</button>
-                <button class="btn btn-danger" onclick="cancelBooking()"><i data-lucide="x" style="width:14px;height:14px"></i> Cancel Booking</button>
-                <button class="btn btn-outline btn-admin" onclick="completeRide()"><i data-lucide="check" style="width:14px;height:14px"></i> Admin: Complete Ride</button>
-            </div>
-            <div class="muted admin-note">Admin/demo action. Requires group size >= 3.</div>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="card-head">
-            <span><i data-lucide="shield-alert" style="width:14px;height:14px"></i> Travel Risk</span>
-            <button class="btn btn-outline btn-mini" type="button" onclick="syncRiskFromSearch(true)">Use Booking Values</button>
-        </div>
-        <div class="card-body pad">
-            <p class="muted">Defaults to your booking destination. Adjust if you want to test a different connection.</p>
-            <div class="form-row">
-                <div class="form-group"><label class="form-label">Destination</label><select class="form-select" id="rDest"></select></div>
-                <div class="form-group"><label class="form-label">Connection time (hrs)</label><input type="number" class="form-input" id="rTime" value="6" min="0" max="24" step="0.5"></div>
-                <div class="form-group"><label class="form-label">Buffer</label><input type="number" class="form-input" id="rBuf" value="1.3" min="1" max="3" step="0.1"></div>
-            </div>
-            <button class="btn btn-black" onclick="calcRisk()">Calculate Risk</button>
-            <div class="risk-result" id="riskRes"><div class="risk-level" id="riskLvl"></div><div class="risk-detail" id="riskDet"></div></div>
-        </div>
-    </div>
-</div>
-
-<div id="results" style="display:none">
-    <div class="card">
-        <div class="card-head"><span id="resultTitle">Matches</span><span class="muted">Click a row to select</span></div>
-        <div class="card-body"><div class="table-wrap" id="matchTable"></div></div>
-    </div>
-</div>
-
-<div class="card">
-    <div class="card-head"><i data-lucide="users" style="width:14px;height:14px"></i> Select Group to Book</div>
+<!-- Search bar — compact, full width -->
+<div class="card" style="margin-bottom:16px">
     <div class="card-body pad">
-        <div class="form-row">
-            <div class="form-group"><label class="form-label">Ride Group</label><select class="form-select" id="grp"></select></div>
+        <div class="search-bar">
+            <div class="form-group">
+                <label class="form-label">Destination</label>
+                <select class="form-select" id="dest"></select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Travel Date</label>
+                <input type="date" class="form-input" id="date" value="2026-05-10">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Bags</label>
+                <input type="number" class="form-input" id="lug" value="0" min="0" max="5" style="width:80px">
+            </div>
+            <button class="btn btn-green" onclick="findRides()" style="align-self:flex-end">
+                <i data-lucide="search" style="width:14px;height:14px"></i> Search
+            </button>
         </div>
     </div>
 </div>
+
+<!-- Two panel layout -->
+<div class="ride-layout">
+
+    <!-- LEFT: Results list -->
+    <div class="ride-list-panel">
+        <div class="ride-list-header">
+            <div id="rideListTitle" style="font-size:13px;font-weight:600;color:var(--ink)">All Available Rides</div>
+            <button class="btn btn-green btn-sm" onclick="openCreateModal()">
+                <i data-lucide="plus" style="width:12px;height:12px"></i> New Group
+            </button>
+        </div>
+        <div id="listEmpty" class="card" style="display:none">
+            <div class="card-body pad" style="text-align:center;padding:40px 20px">
+                <i data-lucide="map-pin" style="width:32px;height:32px;color:var(--text-muted);margin-bottom:12px"></i>
+                <div style="color:var(--text-muted);font-size:13px;margin-bottom:12px">No rides found.</div>
+                <button class="btn btn-outline" onclick="openCreateModal()">+ Create New Group</button>
+            </div>
+        </div>
+        <div id="rideCards"><div class="spinner" style="margin:40px auto"></div></div>
+    </div>
+
+    <!-- RIGHT: Selected ride detail + actions -->
+    <div class="ride-detail-panel">
+        <!-- Default state -->
+        <div id="detailEmpty" class="card">
+            <div class="card-body pad" style="text-align:center;padding:40px 20px">
+                <i data-lucide="mouse-pointer-click" style="width:32px;height:32px;color:var(--text-muted);margin-bottom:12px"></i>
+                <div style="color:var(--text-muted);font-size:13px">Select a ride group on the left to see details and book.</div>
+            </div>
+        </div>
+
+        <!-- Selected state -->
+        <div id="detailCard" style="display:none">
+            <div class="card" style="margin-bottom:12px">
+                <div class="card-head">
+                    <span id="detailTitle">Ride Details</span>
+                    <span id="detailStatus"></span>
+                </div>
+                <div class="card-body pad">
+                    <div class="detail-grid">
+                        <div class="detail-item">
+                            <div class="detail-label">Destination</div>
+                            <div class="detail-val" id="dDest">—</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Date</div>
+                            <div class="detail-val" id="dDate">—</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Departs</div>
+                            <div class="detail-val" id="dTime">—</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Seats left</div>
+                            <div class="detail-val" id="dSeats">—</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Bag space</div>
+                            <div class="detail-val" id="dBags">—</div>
+                        </div>
+                        <div class="detail-item">
+                            <div class="detail-label">Booking as</div>
+                            <div class="detail-val" id="dStudent">—</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PriorityGo (only shown for transit hub destinations) -->
+            <div id="prioritySection" style="display:none;margin-bottom:12px">
+                <div class="card">
+                    <div class="card-body pad">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                            <div>
+                                <div style="font-size:13px;font-weight:600;display:flex;align-items:center;gap:6px">
+                                    <i data-lucide="zap" style="width:14px;height:14px;color:var(--accent-dark)"></i>
+                                    PriorityGo — Guaranteed Seat
+                                </div>
+                                <div style="font-size:12px;color:var(--text-muted);margin-top:2px">Transit hub destination detected. Requires trust ≥ 90.</div>
+                            </div>
+                            <button type="button" class="priority-toggle" id="priorityBtn" onclick="togglePriority()">
+                                <span class="toggle-dot"></span> Enable
+                            </button>
+                        </div>
+                        <div class="priority-check" id="priorityCheck" style="display:none"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Booking confirmation banner -->
+            <div id="bookingConfirmed" style="display:none;background:#e8fce8;border:1px solid #4caf50;border-radius:12px;padding:14px 16px;margin-bottom:12px;display:none">
+                <div style="font-weight:700;color:#2e7d32;font-size:14px;margin-bottom:2px">✓ Seat booked!</div>
+                <div id="bookingConfirmedDetail" style="font-size:12px;color:#388e3c"></div>
+            </div>
+
+            <!-- Action buttons -->
+            <div class="card">
+                <div class="card-body pad">
+                    <div style="display:flex;flex-direction:column;gap:8px">
+                        <button class="btn btn-green" style="width:100%;justify-content:center" onclick="bookRide()">
+                            <i data-lucide="ticket" style="width:14px;height:14px"></i> Book This Ride
+                        </button>
+                        <button class="btn btn-danger" style="width:100%;justify-content:center" onclick="cancelBooking()">
+                            <i data-lucide="x" style="width:14px;height:14px"></i> Cancel My Booking
+                        </button>
+                        <button class="btn btn-outline btn-admin" style="width:100%;justify-content:center" onclick="completeRide()">
+                            <i data-lucide="check" style="width:14px;height:14px"></i> Admin: Complete Ride
+                        </button>
+                        <div class="muted" style="font-size:11px;text-align:center">Complete ride awards +10 trust to all members</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Travel risk — collapsed by default, only shown for transit hubs -->
+            <div id="riskSection" style="display:none;margin-top:12px">
+                <div class="card">
+                    <div class="card-head">
+                        <span><i data-lucide="shield-alert" style="width:14px;height:14px"></i> Connection Risk</span>
+                    </div>
+                    <div class="card-body pad">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Your connection time (hrs)</label>
+                                <input type="number" class="form-input" id="rTime" value="6" min="0" max="24" step="0.5">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Safety buffer</label>
+                                <input type="number" class="form-input" id="rBuf" value="1.3" min="1" max="3" step="0.1">
+                            </div>
+                        </div>
+                        <button class="btn btn-black" onclick="calcRisk()" style="width:100%;justify-content:center">Calculate Risk</button>
+                        <div class="risk-result" id="riskRes">
+                            <div class="risk-level" id="riskLvl"></div>
+                            <div class="risk-detail" id="riskDet"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block scripts %}
 <script>
 let priorityGo = false;
-let lastSearch = null;
-let selectedGroupId = null;
+let selectedGroup = null;
 let groupsCache = [];
 let dests = [];
-let riskManual = false;
 
-function renderStudent(){
-    const s = getCurrentStudent();
-    const el = document.getElementById('currentStudent');
-    if(!el) return;
-    if(!s){
-        el.textContent = 'Select a student';
-        return;
-    }
-    const trustClass = s.trust_score >= 90 ? 'badge-green' : s.trust_score >= 70 ? 'badge-yellow' : 'badge-red';
-    el.innerHTML = '<div class="student-pill"><span class="student-name">'+s.name+'</span><span class="badge '+trustClass+'">Trust '+s.trust_score+'</span></div>';
-}
-
-function renderGroupSelect(grps){
-    const sel = document.getElementById('grp');
-    if(!sel) return;
-    if(!grps || !grps.length){
-        sel.innerHTML = '<option value="">No groups</option>';
-        selectedGroupId = null;
-        return;
-    }
-    sel.innerHTML = grps.map(g=>'<option value="'+g.group_id+'">Group '+g.group_id+' > '+g.city_name+' ('+g.seats_filled+'/'+g.seat_capacity+') ['+g.status+']</option>').join('');
-    if(selectedGroupId && grps.find(g => String(g.group_id) === String(selectedGroupId))){
-        sel.value = selectedGroupId;
-    } else {
-        selectedGroupId = sel.value;
-    }
-}
-
+// ── Init ──────────────────────────────────────────────────────────────────────
 async function init(){
-    renderStudent();
-    const [ds,grps] = await Promise.all([api('/api/destinations'),api('/api/ride-groups')]);
+    const [ds, grps] = await Promise.all([api('/api/destinations'), api('/api/ride-groups')]);
     dests = ds || [];
-    document.getElementById('dest').innerHTML=dests.map(d=>'<option value="'+d.destination_id+'">'+d.city_name+'</option>').join('');
-    document.getElementById('rDest').innerHTML=dests.map(d=>'<option value="'+d.destination_id+'">'+d.city_name+' ('+d.avg_travel_hours+'h)</option>').join('');
-    syncRiskFromSearch(true);
-
     groupsCache = grps || [];
-    renderGroupSelect(groupsCache);
+    document.getElementById('dest').innerHTML = dests.map(d =>
+        '<option value="'+d.destination_id+'">'+d.city_name+'</option>'
+    ).join('');
+    // Auto-show all FORMING groups on load — no search required
+    renderGroupList(groupsCache.filter(g => g.status === 'FORMING' || g.status === 'ACTIVE'), 'All Available Rides');
 }
 
-function syncRiskFromSearch(force){
-    if(force){
-        riskManual = false;
+// ── Render a list of groups as cards ─────────────────────────────────────────
+function renderGroupList(list, title){
+    document.getElementById('rideListTitle').textContent = (title || 'Rides') + ' (' + list.length + ')';
+    const container = document.getElementById('rideCards');
+    if(!list.length){
+        document.getElementById('listEmpty').style.display = 'block';
+        container.innerHTML = '';
+        return;
     }
-    if(riskManual && !force) return;
-    const destVal = document.getElementById('dest')?.value;
-    if(destVal){
-        document.getElementById('rDest').value = destVal;
+    document.getElementById('listEmpty').style.display = 'none';
+    container.innerHTML = list.map(m => {
+        const seatsLeft = m.seat_capacity - m.seats_filled;
+        const seatsColor = seatsLeft === 0 ? '#e53935' : seatsLeft <= 1 ? '#fb8c00' : '#2e7d32';
+        return `
+        <div class="ride-card" data-id="${m.group_id}" onclick="selectGroup(${m.group_id}, this)">
+            <div class="ride-card-top">
+                <div class="ride-dest">Patiala → ${m.city_name}</div>
+                <span class="badge badge-blue">#${m.group_id}</span>
+            </div>
+            <div class="ride-card-meta">
+                <span>${m.departure_date}</span>
+                <span>${m.departure_time || '—'}</span>
+            </div>
+            <div class="ride-card-bottom">
+                <div class="ride-stat" style="color:${seatsColor};font-weight:600">
+                    <i data-lucide="users" style="width:12px;height:12px"></i>
+                    <span>${seatsLeft} seat${seatsLeft !== 1 ? 's' : ''} left</span>
+                </div>
+                <div class="ride-stat">
+                    <i data-lucide="briefcase" style="width:12px;height:12px"></i>
+                    <span>${m.seat_capacity - m.total_luggage} bag space</span>
+                </div>
+                <div class="ride-stat" style="margin-left:auto">
+                    ${seatsLeft === 0 ? '<span style="color:#e53935;font-size:11px;font-weight:700">FULL</span>' : '<span style="color:var(--accent-dark);font-size:11px;font-weight:700">OPEN</span>'}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+    lucide.createIcons();
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+async function findRides(){
+    const destVal = document.getElementById('dest').value;
+    const dateVal = document.getElementById('date').value;
+    const lug = document.getElementById('lug').value;
+    if(!destVal || !dateVal){ toast('Select destination and date','error'); return; }
+
+    const data = await api('/api/find-buddies',{method:'POST',body:{
+        destination_id: destVal,
+        travel_date: dateVal,
+        luggage_count: lug
+    }});
+    if(!data) return;
+
+    // Update cache with fresh data
+    const grps = await api('/api/ride-groups');
+    groupsCache = grps || [];
+
+    const destName = dests.find(d => String(d.destination_id) === String(destVal));
+    const label = (destName ? destName.city_name : 'that destination') + ' on ' + dateVal;
+
+    if(!data.count){
+        document.getElementById('rideListTitle').textContent = 'No rides to ' + label;
+        document.getElementById('listEmpty').style.display = 'block';
+        document.getElementById('rideCards').innerHTML = `
+            <div class="card">
+                <div class="card-body pad" style="text-align:center;padding:20px">
+                    <button class="btn btn-outline" onclick="openCreateModal()">+ Create New Group for this date</button>
+                </div>
+            </div>`;
+        return;
     }
+
+    // Merge match data into groupsCache for seat counts
+    const matchIds = data.matches.map(m => m.group_id);
+    const enriched = data.matches.map(m => {
+        const cached = groupsCache.find(g => String(g.group_id) === String(m.group_id)) || {};
+        return { ...cached, ...m, available_seats: m.available_seats, available_bag_space: m.available_bag_space };
+    });
+
+    renderGroupList(enriched.map(m => ({
+        ...m,
+        seat_capacity: m.seat_capacity || (m.available_seats + (m.seats_filled || 0)),
+        seats_filled: m.seats_filled || 0,
+        total_luggage: m.total_luggage || 0
+    })), 'Rides to ' + (destName ? destName.city_name : '') + ' on ' + dateVal);
 }
 
-function markRiskManual(){
-    riskManual = true;
+// ── Select group ──────────────────────────────────────────────────────────────
+function selectGroup(id, el){
+    // Highlight selected card
+    document.querySelectorAll('.ride-card').forEach(c => c.classList.remove('ride-card-selected'));
+    el.classList.add('ride-card-selected');
+
+    // Find full group data
+    const match = (groupsCache || []).find(g => String(g.group_id) === String(id));
+    selectedGroup = { group_id: id, ...match };
+
+    // Find dest info
+    const destSel = document.getElementById('dest');
+    const destId = destSel.value;
+    const destInfo = dests.find(d => String(d.destination_id) === String(destId));
+    const isTransit = destInfo && destInfo.is_transit_hub === 'Y';
+
+    // Populate detail panel
+    document.getElementById('detailEmpty').style.display = 'none';
+    document.getElementById('detailCard').style.display = 'block';
+    document.getElementById('detailTitle').textContent = 'Group #' + id;
+    document.getElementById('detailStatus').innerHTML = badge(match ? match.status : 'FORMING');
+    document.getElementById('dDest').textContent = match ? match.city_name : '—';
+    document.getElementById('dDate').textContent = match ? match.departure_date : '—';
+    document.getElementById('dTime').textContent = match ? (match.departure_time || '—') : '—';
+    document.getElementById('dSeats').textContent = match ? (match.seat_capacity - match.seats_filled) + ' / ' + match.seat_capacity : '—';
+    document.getElementById('dBags').textContent = match ? (match.seat_capacity - match.total_luggage) + ' available' : '—';
+
+    const s = getCurrentStudent();
+    document.getElementById('dStudent').textContent = s ? s.name + ' (Trust ' + s.trust_score + ')' : '—';
+
+    // Show PriorityGo + risk only for transit hubs
+    document.getElementById('prioritySection').style.display = isTransit ? 'block' : 'none';
+    document.getElementById('riskSection').style.display = isTransit ? 'block' : 'none';
+
+    // Reset priority toggle
+    priorityGo = false;
+    document.getElementById('priorityBtn').classList.remove('active');
+    document.getElementById('priorityCheck').style.display = 'none';
+
+    lucide.createIcons();
 }
 
+// ── PriorityGo ────────────────────────────────────────────────────────────────
 async function togglePriority(){
     const btn = document.getElementById('priorityBtn');
-    const info = document.getElementById('priorityInfo');
-
+    const check = document.getElementById('priorityCheck');
     if(!priorityGo){
-        // Call DB function to check eligibility
         const sid = getCurrentStudentId();
-        if(!sid){
-            toast('Select a student first','error');
-            return;
-        }
+        if(!sid){ toast('Select a student first','error'); return; }
         const d = await api('/api/priority-check',{method:'POST',body:{student_id: sid}});
         if(!d) return;
-
         if(d.status !== 'ELIGIBLE'){
-            toast('PriorityGo: ' + d.status.replace('NOT_ELIGIBLE:','Trust score is ') + '. Need 90+','error');
+            check.className = 'priority-check warn';
+            check.style.display = 'block';
+            check.textContent = 'Not eligible — ' + d.status.replace('NOT_ELIGIBLE:','trust score is ') + ', need 90+';
             return;
         }
         priorityGo = true;
         btn.classList.add('active');
-        info.classList.add('show');
-        toast('PriorityGo enabled — pay upfront for a guaranteed seat','success');
+        btn.innerHTML = '<span class="toggle-dot"></span> Enabled';
+        check.className = 'priority-check ok';
+        check.style.display = 'block';
+        check.textContent = 'PriorityGo active — your seat is guaranteed.';
     } else {
         priorityGo = false;
         btn.classList.remove('active');
-        info.classList.remove('show');
+        btn.innerHTML = '<span class="toggle-dot"></span> Enable';
+        check.style.display = 'none';
     }
 }
 
-async function findRides(useLast){
-    const dateVal = document.getElementById('date').value;
-    const destVal = document.getElementById('dest').value;
-    if(!useLast){
-        if(!dateVal || !destVal){
-            toast('Select destination and date','error');
-            return;
-        }
-    }
-    const payload = (useLast && lastSearch) ? lastSearch : {
-        destination_id:destVal,
-        travel_date:dateVal,
-        luggage_count:document.getElementById('lug').value
-    };
-    if(!useLast){
-        lastSearch = payload;
-    }
-    const data = await api('/api/find-buddies',{method:'POST',body:payload});
-    if(!data)return;
-    if(data.error){toast(data.error,'error');return;}
-
-    document.getElementById('results').style.display='block';
-    document.getElementById('resultTitle').textContent=data.count+' Match'+(data.count!==1?'es':'') + (priorityGo?' — PriorityGo':'');
-
-    if(data.count === 0) {
-        document.getElementById('matchTable').innerHTML=`
-            <div style="padding:24px;text-align:center;color:var(--text-secondary)">
-                <p style="margin-bottom:12px">No ride groups are heading there on that date.</p>
-                <button class="btn btn-outline" onclick="createGroup()">Create New Ride Group</button>
-            </div>
-        `;
-        toast('No matches found','info');
-        return;
-    }
-
-    let h='<table><thead><tr><th>Group</th><th>Destination</th><th>Date</th><th>Departs</th><th>Seats</th><th>Bags</th>'+(priorityGo?'<th>Guarantee</th>':'')+'</tr></thead><tbody>';
-    data.matches.forEach(m=>{
-        h+='<tr class="row-selectable" data-group-id="'+m.group_id+'" data-destination-id="'+m.destination_id+'"><td>#'+m.group_id+'</td><td>'+m.city_name+'</td><td>'+m.departure_date+'</td><td>'+m.departure_time+'</td><td><span class="badge badge-green">'+m.available_seats+'</span></td><td><span class="badge badge-blue">'+m.available_bag_space+'</span></td>';
-        if(priorityGo) h+='<td><span class="badge badge-green">Guaranteed</span></td>';
-        h+='</tr>';
-    });
-    document.getElementById('matchTable').innerHTML=h+'</tbody></table>';
-    selectedGroupId = null;
-    document.querySelectorAll('#matchTable tbody tr').forEach(tr => {
-        tr.setAttribute('tabindex','0');
-        tr.setAttribute('role','button');
-        tr.addEventListener('click', () => selectGroup(tr.dataset.groupId));
-        tr.addEventListener('keydown', (e) => {
-            if(e.key === 'Enter' || e.key === ' '){
-                e.preventDefault();
-                selectGroup(tr.dataset.groupId);
-            }
-        });
-    });
-    toast('Found '+data.count+' match(es)','success');
-}
-
-async function createGroup() {
-    const d = await api('/api/create-group',{method:'POST',body:{
-        destination_id: document.getElementById('dest').value,
-        departure_date: document.getElementById('date').value
-    }});
-    if(!d)return;
-    if(d.success){
-        toast('New ride group created! You can now search again and book it.','success');
-        await refreshAfterAction();
-    } else {
-        toast(d.error||'Failed to create group','error');
-    }
-}
-
-function selectGroup(id){
-    selectedGroupId = String(id);
-    document.querySelectorAll('#matchTable tbody tr').forEach(tr => {
-        tr.classList.toggle('row-selected', tr.dataset.groupId === selectedGroupId);
-        if(tr.dataset.groupId === selectedGroupId && tr.dataset.destinationId){
-            document.getElementById('rDest').value = tr.dataset.destinationId;
-            riskManual = false;
-        }
-    });
-    const sel = document.getElementById('grp');
-    if(sel) sel.value = selectedGroupId;
-}
-
-function syncSelectionFromDropdown(){
-    const sel = document.getElementById('grp');
-    if(!sel) return;
-    selectedGroupId = sel.value || null;
-    document.querySelectorAll('#matchTable tbody tr').forEach(tr => {
-        tr.classList.toggle('row-selected', tr.dataset.groupId === selectedGroupId);
-    });
-
-    const group = (groupsCache || []).find(g => String(g.group_id) === String(selectedGroupId));
-    if(group && dests && dests.length){
-        const match = dests.find(d => d.city_name === group.city_name);
-        if(match){
-            document.getElementById('rDest').value = match.destination_id;
-            riskManual = false;
-        }
-    }
-}
-
-async function refreshGroups(){
-    groupsCache = await api('/api/ride-groups');
-    renderGroupSelect(groupsCache || []);
-}
-
-async function refreshAfterAction(){
-    await refreshGroups();
-    if(typeof refreshStudents === 'function'){
-        await refreshStudents();
-        renderStudent();
-    }
-    if(lastSearch){
-        await findRides(true);
-    }
-}
-
+// ── Book ──────────────────────────────────────────────────────────────────────
 async function bookRide(){
     const sid = getCurrentStudentId();
-    if(!sid){
-        toast('Select a student first','error');
-        return;
-    }
-    const groupId = selectedGroupId || document.getElementById('grp').value;
-    if(!groupId){
-        toast('Select a ride group first','error');
-        return;
-    }
-
-    syncRiskFromSearch(true);
-
-    const group = (groupsCache || []).find(g => String(g.group_id) === String(groupId));
-    if(group){
-        if(String(group.status) !== 'FORMING'){
-            toast('This group is not open for booking','error');
-            return;
-        }
-        if(Number(group.seats_filled) >= Number(group.seat_capacity)){
-            toast('This group is already full','error');
-            return;
-        }
-    }
-
-    const myBookings = await api('/api/student-bookings/' + sid);
-    if(myBookings && myBookings.find(b => String(b.group_id) === String(groupId) && b.status !== 'COMPLETED')){
-        toast('You are already booked in this group','error');
-        return;
-    }
+    if(!sid){ toast('Select a student first','error'); return; }
+    if(!selectedGroup){ toast('Select a ride group first','error'); return; }
 
     const d = await api('/api/book',{method:'POST',body:{
-        group_id: groupId,
+        group_id: selectedGroup.group_id,
         student_id: sid,
-        luggage_count:document.getElementById('lug').value,
+        luggage_count: document.getElementById('lug').value,
         priority_go: priorityGo
     }});
-    if(!d)return;
+    if(!d) return;
     if(d.success){
-        toast(d.message || 'Booked successfully','success');
-        await refreshAfterAction();
+        // Show visible confirmation banner in the detail panel
+        const banner = document.getElementById('bookingConfirmed');
+        const s = getCurrentStudent();
+        banner.style.display = 'block';
+        document.getElementById('bookingConfirmedDetail').textContent =
+            (s ? s.name : 'You') + ' are booked on Group #' + selectedGroup.group_id +
+            ' to ' + (selectedGroup.city_name || '—') + ' on ' + (selectedGroup.departure_date || '—');
+        toast('Booked successfully!','success');
+        await refresh();
     } else {
-        toast(d.error,'error');
-        await refreshGroups();
+        toast(d.error || 'Booking failed','error');
     }
 }
 
-async function calcRisk(){
-    const d=await api('/api/travel-risk',{method:'POST',body:{
-        destination_id:document.getElementById('rDest').value,
-        connection_time:document.getElementById('rTime').value,
-        buffer_factor:document.getElementById('rBuf').value
-    }});
-    if(!d)return;
-    const l=d.risk_level,c=l==='SAFE'?'safe':l==='RISKY'?'risky':'critical';
-    const el=document.getElementById('riskRes');
-    el.className='risk-result show '+c;
-    document.getElementById('riskLvl').className='risk-level '+c;
-    document.getElementById('riskLvl').textContent=l;
-    const dest=dests.find(x=>String(x.destination_id)===String(document.getElementById('rDest').value));
-    const req=(dest.avg_travel_hours*parseFloat(document.getElementById('rBuf').value)).toFixed(1);
-    document.getElementById('riskDet').textContent=dest.avg_travel_hours+'h x '+document.getElementById('rBuf').value+' = '+req+'h required | You have '+document.getElementById('rTime').value+'h';
-}
-
+// ── Cancel ────────────────────────────────────────────────────────────────────
 async function cancelBooking(){
     const sid = getCurrentStudentId();
-    if(!sid){
-        toast('Select a student first','error');
-        return;
-    }
-    const groupId = selectedGroupId || document.getElementById('grp').value;
-    if(!groupId){
-        toast('Select a ride group first','error');
-        return;
-    }
-    if(!confirm('Cancel this booking? Trust penalty may apply.')) return;
-    const d=await api('/api/cancel-booking',{method:'POST',body:{
-        group_id: groupId,
+    if(!sid){ toast('Select a student first','error'); return; }
+    if(!selectedGroup){ toast('Select a ride group first','error'); return; }
+    if(!confirm('Cancel booking? A -15 trust penalty will apply.')) return;
+    const d = await api('/api/cancel-booking',{method:'POST',body:{
+        group_id: selectedGroup.group_id,
         student_id: sid
     }});
-    if(!d)return;
+    if(!d) return;
     if(d.success){
-        toast('Cancelled — trust penalty applied (-15)','info');
-        await refreshAfterAction();
+        toast('Cancelled — trust -15 applied','info');
+        await refresh();
     } else {
-        toast(d.error||'Failed','error');
-        await refreshGroups();
+        toast(d.error || 'Failed','error');
     }
 }
 
+// ── Complete ──────────────────────────────────────────────────────────────────
 async function completeRide(){
-    const groupId = selectedGroupId || document.getElementById('grp').value;
-    if(!groupId){
-        toast('Select a ride group first','error');
-        return;
-    }
-    if(!confirm('Complete this ride? This is an admin/demo action.')) return;
-    const d=await api('/api/complete-ride',{method:'POST',body:{group_id: groupId}});
-    if(!d)return;
+    if(!selectedGroup){ toast('Select a ride group first','error'); return; }
+    if(!confirm('Mark this ride as completed? Trust +10 for all members.')) return;
+    const d = await api('/api/complete-ride',{method:'POST',body:{group_id: selectedGroup.group_id}});
+    if(!d) return;
     if(d.success){
         toast('Ride completed — trust +10 for all members','success');
-        await refreshAfterAction();
+        await refresh();
     } else {
-        toast(d.error||'Failed','error');
-        await refreshGroups();
+        toast(d.error || 'Failed','error');
     }
 }
 
-document.addEventListener('student:ready', renderStudent);
+// ── Risk ──────────────────────────────────────────────────────────────────────
+async function calcRisk(){
+    const destId = document.getElementById('dest').value;
+    const d = await api('/api/travel-risk',{method:'POST',body:{
+        destination_id: destId,
+        connection_time: document.getElementById('rTime').value,
+        buffer_factor: document.getElementById('rBuf').value
+    }});
+    if(!d) return;
+    const l = d.risk_level;
+    const c = l === 'SAFE' ? 'safe' : l === 'RISKY' ? 'risky' : 'critical';
+    const el = document.getElementById('riskRes');
+    el.className = 'risk-result show ' + c;
+    document.getElementById('riskLvl').className = 'risk-level ' + c;
+    document.getElementById('riskLvl').textContent = l;
+    const dest = dests.find(x => String(x.destination_id) === String(destId));
+    const req = dest ? (dest.avg_travel_hours * parseFloat(document.getElementById('rBuf').value)).toFixed(1) : '?';
+    document.getElementById('riskDet').textContent = 'Need ' + req + 'h — you have ' + document.getElementById('rTime').value + 'h';
+}
 
-document.addEventListener('DOMContentLoaded',()=>{
-    const destSel = document.getElementById('dest');
-    if(destSel){
-        destSel.addEventListener('change', () => syncRiskFromSearch(false));
+// ── Create group modal ────────────────────────────────────────────────────────
+function openCreateModal(){
+    // Populate dest dropdown from already-loaded dests
+    const cgDest = document.getElementById('cgDest');
+    if(dests.length && !cgDest.options.length){
+        cgDest.innerHTML = dests.map(d => '<option value="'+d.destination_id+'">'+d.city_name+'</option>').join('');
     }
+    // Pre-fill from search fields if available
+    const d = document.getElementById('date').value;
+    const dest = document.getElementById('dest').value;
+    document.getElementById('cgDate').value = d || new Date().toISOString().slice(0,10);
+    if(dest) cgDest.value = dest;
+    document.getElementById('cgTime').value = '08:00';
+    document.getElementById('createModal').style.display = 'flex';
+}
+function closeCreateModal(){
+    document.getElementById('createModal').style.display = 'none';
+}
+async function submitCreateGroup(){
+    const destId = document.getElementById('cgDest').value;
+    const date = document.getElementById('cgDate').value;
+    const time = document.getElementById('cgTime').value;
+    if(!destId || !date){ toast('Fill all fields','error'); return; }
+    const btn = document.getElementById('cgSubmitBtn');
+    btn.disabled = true; btn.textContent = 'Creating...';
+    const d = await api('/api/create-group',{method:'POST',body:{
+        destination_id: destId,
+        departure_date: date,
+        departure_time: time
+    }});
+    btn.disabled = false; btn.textContent = 'Create Group';
+    if(!d){ return; }
+    if(d.success || d.group_id){
+        toast('Group created! It\'s now visible in the list.','success');
+        closeCreateModal();
+        // Reload all groups
+        const grps = await api('/api/ride-groups');
+        groupsCache = grps || [];
+        renderGroupList(groupsCache.filter(g => g.status === 'FORMING' || g.status === 'ACTIVE'), 'All Available Rides');
+    } else {
+        toast(d.error || 'Failed to create group','error');
+    }
+}
 
-    const rDest = document.getElementById('rDest');
-    const rTime = document.getElementById('rTime');
-    const rBuf = document.getElementById('rBuf');
-    if(rDest) rDest.addEventListener('change', markRiskManual);
-    if(rTime) rTime.addEventListener('change', markRiskManual);
-    if(rBuf) rBuf.addEventListener('change', markRiskManual);
+// ── Create group (legacy, now routes to modal) ────────────────────────────────
+function createGroup(){ openCreateModal(); }
 
-    document.addEventListener('student:change',()=>{
-        renderStudent();
-        if(priorityGo){
-            priorityGo=false;
-            document.getElementById('priorityBtn').classList.remove('active');
-            document.getElementById('priorityInfo').classList.remove('show');
-        }
-    });
-    const sel = document.getElementById('grp');
-    if(sel){
-        sel.addEventListener('change', syncSelectionFromDropdown);
+// ── Refresh ───────────────────────────────────────────────────────────────────
+async function refresh(){
+    const grps = await api('/api/ride-groups');
+    groupsCache = grps || [];
+    await refreshStudents();
+    // Re-render detail if group still selected
+    if(selectedGroup){
+        const updated = groupsCache.find(g => String(g.group_id) === String(selectedGroup.group_id));
+        if(updated) selectedGroup = { ...selectedGroup, ...updated };
+        document.getElementById('dSeats').textContent = updated ? (updated.seat_capacity - updated.seats_filled) + ' / ' + updated.seat_capacity : '—';
+        document.getElementById('dStatus').textContent = updated ? updated.status : '—';
+    }
+}
+
+document.addEventListener('student:ready', init);
+document.addEventListener('student:change', () => {
+    const s = getCurrentStudent();
+    if(s) document.getElementById('dStudent').textContent = s.name + ' (Trust ' + s.trust_score + ')';
+    priorityGo = false;
+    const btn = document.getElementById('priorityBtn');
+    if(btn) btn.classList.remove('active');
+});
+</script>
+
+<style>
+.search-bar {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    flex-wrap: wrap;
+}
+
+.search-bar .form-group { flex: 1; min-width: 140px; }
+
+.ride-layout {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    align-items: start;
+}
+
+@media (max-width: 768px) {
+    .ride-layout { grid-template-columns: 1fr; }
+}
+
+.ride-list-panel { display: flex; flex-direction: column; gap: 10px; }
+.ride-detail-panel { position: sticky; top: 20px; }
+
+.ride-card {
+    background: var(--white);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 16px 18px;
+    cursor: pointer;
+    transition: all 150ms;
+    box-shadow: 0 2px 8px var(--shadow);
+}
+
+.ride-card:hover {
+    border-color: var(--accent-dark);
+    box-shadow: 0 4px 16px var(--shadow);
+    transform: translateY(-1px);
+}
+
+.ride-card-selected {
+    border-color: var(--accent-dark);
+    background: rgba(195, 248, 50, 0.08);
+    box-shadow: 0 0 0 2px rgba(195, 248, 50, 0.4);
+}
+
+.ride-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.ride-dest {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+}
+
+.ride-card-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.ride-card-bottom {
+    display: flex;
+    gap: 16px;
+    border-top: 1px solid var(--border);
+    padding-top: 10px;
+}
+
+.ride-stat {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+}
+
+.detail-item {}
+.detail-label {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin-bottom: 3px;
+}
+.detail-val {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+}
+.ride-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+</style>
+
+<!-- Create Group Modal -->
+<div id="createModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:1000;align-items:center;justify-content:center">
+    <div style="background:var(--white);border-radius:20px;padding:28px;width:400px;max-width:90vw;box-shadow:0 24px 64px rgba(0,0,0,0.2)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <div style="font-size:16px;font-weight:700;color:var(--ink)">Create New Ride Group</div>
+            <button onclick="closeCreateModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:24px;line-height:1;padding:0 4px">×</button>
+        </div>
+        <div class="form-group" style="margin-bottom:14px">
+            <label class="form-label">Destination</label>
+            <select class="form-select" id="cgDest"></select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+            <div class="form-group">
+                <label class="form-label">Departure Date</label>
+                <input type="date" class="form-input" id="cgDate">
+            </div>
+            <div class="form-group">
+                <label class="form-label">Departure Time</label>
+                <input type="time" class="form-input" id="cgTime" value="08:00">
+            </div>
+        </div>
+        <div style="display:flex;gap:10px">
+            <button class="btn btn-outline" style="flex:1;justify-content:center" onclick="closeCreateModal()">Cancel</button>
+            <button id="cgSubmitBtn" class="btn btn-green" style="flex:2;justify-content:center" onclick="submitCreateGroup()">Create Group</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Populate modal destination dropdown after dests are loaded
+document.addEventListener('student:ready', () => {
+    const cgDest = document.getElementById('cgDest');
+    if(cgDest && dests.length){
+        cgDest.innerHTML = dests.map(d => '<option value="'+d.destination_id+'">'+d.city_name+'</option>').join('');
     }
 });
-
-init();
+// Lock student selector on this page
+document.addEventListener('student:ready', () => {
+    const sel = document.getElementById('navStudent');
+    if(sel) sel.disabled = true;
+});
 </script>
+
 {% endblock %}
