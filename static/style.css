@@ -190,6 +190,20 @@ body {
     padding: 24px 24px 64px;
 }
 
+/* Find Rides page: full-bleed map layout */
+.page.page-find {
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+.app-main.app-main-find {
+    overflow: hidden;
+    height: calc(100vh - 64px);
+}
+
 .page-title {
     font-size: 32px;
     font-weight: 700;

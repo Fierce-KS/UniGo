@@ -23,7 +23,7 @@
             <div class="side-dot"></div>
         </div>
     </aside>
-    <div class="app-main">
+    <div class="app-main {{ 'app-main-find' if active == 'find' }}">
         <header class="topbar">
             <div class="topbar-left">
                 <div class="topbar-title">UniGo</div>
@@ -39,7 +39,7 @@
                 <div class="pill">Oracle 21c XE</div>
             </div>
         </header>
-        <div class="page">{% block content %}{% endblock %}</div>
+        <div class="page {{ 'page-find' if active == 'find' }}">{% block content %}{% endblock %}</div>
     </div>
 </div>
 <div class="toast-box" id="toasts" role="status" aria-live="polite" aria-atomic="true"></div>

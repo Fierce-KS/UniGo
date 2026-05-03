@@ -87,7 +87,7 @@ def a10():
 def a11():
     d = request.json
     # Hardcoding vehicle_id 1 (Sedan) for demo purposes. Mod C handles vehicle selection.
-    return jsonify(proc("create_ride_group", [int(d["destination_id"]), d["departure_date"], 1]))
+    return jsonify(proc("create_ride_group", [int(d["destination_id"]), d["departure_date"], d.get("departure_time", "08:00"), 401]))
 
 @app.route("/api/complete-ride", methods=["POST"])
 def a12():

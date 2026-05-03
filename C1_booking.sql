@@ -32,10 +32,12 @@
 CREATE OR REPLACE PROCEDURE create_ride_group (
     p_destination_id  IN NUMBER,
     p_departure_date  IN VARCHAR2,   -- 'YYYY-MM-DD' string from Flask
+    p_departure_time  IN VARCHAR2,   -- 'HH:MM' string from Flask
     p_vehicle_id      IN NUMBER
 ) AS
     v_dest_count  NUMBER;
     v_veh_count   NUMBER;
+    v_existing    NUMBER;
 BEGIN
     -- Validate destination exists
     SELECT COUNT(*) INTO v_dest_count
@@ -43,8 +45,7 @@ BEGIN
     WHERE destination_id = p_destination_id;
 
     IF v_dest_count = 0 THEN
-        DBMS_OUTPUT.PUT_LINE('FAILED: Destination ' || p_destination_id || ' not found.');
-        RETURN;
+        RAISE_APPLICATION_ERROR(-20010, 'Destination ' || p_destination_id || ' not found.');
     END IF;
 
     -- Validate vehicle exists
@@ -53,7 +54,19 @@ BEGIN
     WHERE vehicle_id = p_vehicle_id;
 
     IF v_veh_count = 0 THEN
-        DBMS_OUTPUT.PUT_LINE('FAILED: Vehicle ' || p_vehicle_id || ' not found.');
+        RAISE_APPLICATION_ERROR(-20011, 'Vehicle ' || p_vehicle_id || ' not found.');
+    END IF;
+
+    -- Duplicate guard: return silently if FORMING group already exists for same dest+date+time
+    SELECT COUNT(*) INTO v_existing
+    FROM Ride_Groups
+    WHERE destination_id  = p_destination_id
+      AND departure_date   = TO_DATE(p_departure_date, 'YYYY-MM-DD')
+      AND departure_time   = p_departure_time
+      AND status           = 'FORMING';
+
+    IF v_existing > 0 THEN
+        DBMS_OUTPUT.PUT_LINE('INFO: Duplicate group skipped — already FORMING.');
         RETURN;
     END IF;
 
@@ -72,7 +85,7 @@ BEGIN
         p_vehicle_id,
         p_destination_id,
         TO_DATE(p_departure_date, 'YYYY-MM-DD'),
-        NULL,
+        p_departure_time,
         0,
         0,
         'FORMING',
@@ -85,10 +98,10 @@ BEGIN
 EXCEPTION
     WHEN OTHERS THEN
         ROLLBACK;
-        DBMS_OUTPUT.PUT_LINE('ERROR in create_ride_group: ' || SQLERRM);
+        RAISE_APPLICATION_ERROR(-20012, SQLERRM);
+        --RAISE;  -- re-raise so Flask proc() catches it and returns {success:false, error:...}
 END create_ride_group;
 /
-
 
 -- =============================================================================
 -- PROCEDURE 2: book_ride
