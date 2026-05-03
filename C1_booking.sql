@@ -177,30 +177,31 @@ BEGIN
         RETURN;
     END IF;
 
-    -- ── Step 5: PriorityGo check — only if student has a connecting trip ──
+    -- ── Step 5: PriorityGo check — if group goes to a transit hub, trust >= 90 required ──
+    -- A transit hub destination (airport/railway station) implies connection risk.
+    -- We check is_transit_hub on the group's destination, not the student's trip request,
+    -- because the group destination is what determines PriorityGo eligibility at booking time.
+    DECLARE
+        v_is_hub CHAR(1);
     BEGIN
-        SELECT has_connection INTO v_has_conn
-        FROM Trip_Requests
-        WHERE student_id = p_student_id
-          AND status = 'OPEN'
-          AND ROWNUM = 1;
-    EXCEPTION
-        WHEN NO_DATA_FOUND THEN v_has_conn := 'N';
-    END;
+        SELECT is_transit_hub INTO v_is_hub
+        FROM Destinations
+        WHERE destination_id = v_dest_id;
 
-    IF v_has_conn = 'Y' THEN
-        SELECT trust_score INTO v_trust
-        FROM Students
-        WHERE student_id = p_student_id;
+        IF v_is_hub = 'Y' THEN
+            SELECT trust_score INTO v_trust
+            FROM Students
+            WHERE student_id = p_student_id;
 
-        IF v_trust < 90 THEN
-            ROLLBACK TO before_member_add;
-            DBMS_OUTPUT.PUT_LINE('FAILED: PriorityGo requires trust score >= 90. ' ||
-                                 'Student ' || p_student_id ||
-                                 ' has trust score: ' || v_trust);
-            RETURN;
+            IF v_trust < 90 THEN
+                ROLLBACK TO before_member_add;
+                DBMS_OUTPUT.PUT_LINE('FAILED: PriorityGo requires trust score >= 90. ' ||
+                                     'Student ' || p_student_id ||
+                                     ' has trust score: ' || v_trust);
+                RETURN;
+            END IF;
         END IF;
-    END IF;
+    END;
 
     -- ── Step 6: Insert membership ──────────────────────────────────────────
     -- trg_seat_sync fires here: seats_filled + 1, total_luggage + p_luggage
