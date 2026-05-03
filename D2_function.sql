@@ -117,19 +117,19 @@ CREATE OR REPLACE PROCEDURE log_trust_change (
 ) AS
 BEGIN
     INSERT INTO Trust_Audit_Log (
-        audit_id,
+        audit_id, 
         student_id,
-        old_score,
-        new_score,
-        reason,
-        created_at
+        old_score, 
+        new_score, 
+        reason, 
+        changed_at
     ) VALUES (
-        trust_audit_seq.NEXTVAL,
-        p_student_id,
-        p_old_score,
-        p_new_score,
-        p_reason,
-        SYSDATE
+        trust_audit_seq.NEXTVAL, 
+        p_student_id, 
+        p_old_score, 
+        p_new_score, 
+        p_reason, 
+        SYSTIMESTAMP
     );
 END log_trust_change;
 /
